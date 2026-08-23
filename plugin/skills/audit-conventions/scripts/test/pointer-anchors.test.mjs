@@ -5,15 +5,21 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 
 import {
+  buildTargetIndex,
   collectPointers,
   extractAnchor,
+  findAnchorOccurrences,
   listCitingFiles,
   listTargetCandidates,
   matchCandidates,
   normalizeAnchorText,
+  normalizeForMatch,
   parseLineSpec,
   parsePointersInLine,
   scanPointerAnchors,
+  stripEmphasisMarkers,
+  verifyAnchor,
+  verifyAnchors,
 } from '../lib/pointer-anchors.mjs';
 
 // ---- fixture plumbing --------------------------------------------------------
@@ -540,6 +546,39 @@ test('extractAnchor: real shape — designer.md pointer, possessive + plain pros
   assert.equal(extractAnchor(tailAfter(line)), null);
 });
 
+test('extractAnchor: real shape — designer.md pointer, quoted span italicized inside its connector paren', () => {
+  // The `(*"…"*)` shape, verbatim from the corpus and the only occurrence of it
+  // there: the emphasis markers sit OUTSIDE the quotes, so a grammar that
+  // allowed a connector then a quote but nothing between them read this
+  // genuinely anchored pointer as carrying no anchor at all.
+  const first = `${cite('designer.md', '89')} (*"Measure the baseline by running the row's own command`;
+  const second = 'against the pre-change tree — never assert one from reading the file"*);';
+  const anchor = extractAnchor(wrappedTailAfter(first, second));
+  assert.equal(anchor.form, 'quoted');
+  assert.equal(anchor.connector, '(');
+  assert.equal(anchor.wrapped, true);
+  // The markers are consumed by the grammar, so neither the stored text nor
+  // the raw span carries them.
+  assert.equal(
+    anchor.text,
+    "Measure the baseline by running the row's own command against the pre-change tree — never assert one from reading the file",
+  );
+  assert.ok(!anchor.raw.includes('*'));
+  assert.equal(anchor.raw.startsWith('"'), true);
+  assert.equal(anchor.raw.endsWith('"'), true);
+});
+
+test('extractAnchor: an underscore-emphasized quoted span is an anchor', () => {
+  const anchor = extractAnchor(tailAfter(`See ${cite('a/analyst.md', '59')} (__"the emphasized span"__).`));
+  assert.equal(anchor.text, 'the emphasized span');
+  assert.equal(anchor.raw, '"the emphasized span"');
+});
+
+test('extractAnchor: emphasis alone is not a connector — plain prose after it is still no anchor', () => {
+  const line = `See ${cite('a/analyst.md', '59')} is *how* the rule is stated.`;
+  assert.equal(extractAnchor(tailAfter(line)), null);
+});
+
 // ---- anchor extraction: artifact guards --------------------------------------
 
 test('extractAnchor: a sibling pointer after a comma is not read as a backticked anchor', () => {
@@ -827,6 +866,388 @@ test('scanPointerAnchors: a nonexistent repo root yields no findings', async () 
   const dir = await withTempRepo(async () => {});
   await rm(dir, { recursive: true, force: true });
   assert.deepEqual(await scanPointerAnchors(dir), []);
+});
+
+// ---- normalization for comparison --------------------------------------------
+
+test('stripEmphasisMarkers: markdown emphasis goes, an intra-word underscore stays', () => {
+  assert.equal(stripEmphasisMarkers('do **not** treat the copy'), 'do not treat the copy');
+  assert.equal(stripEmphasisMarkers('_emphasis_ here'), 'emphasis here');
+  // An identifier is not emphasized prose — collapsing it would equate it with
+  // a different identifier spelled without the underscores.
+  assert.equal(stripEmphasisMarkers('DEFAULT_EXCLUDE_PATHS'), 'DEFAULT_EXCLUDE_PATHS');
+  assert.equal(stripEmphasisMarkers('snake_case_name'), 'snake_case_name');
+});
+
+test('normalizeForMatch: squeezes whitespace, folds case, and drops emphasis', () => {
+  assert.equal(normalizeForMatch('  The  **Fixed**\n   Target '), 'the fixed target');
+});
+
+test('buildTargetIndex: joins lines into one searchable string with a line map', () => {
+  const index = buildTargetIndex('  alpha\n\n   beta\ngamma\n');
+  // Blank lines contribute nothing; the rest join with a single space, their
+  // own indentation already normalized away.
+  assert.equal(index.text, 'alpha beta gamma');
+  assert.deepEqual(index.marks, [
+    { offset: 0, line: 1 },
+    { offset: 6, line: 3 },
+    { offset: 11, line: 4 },
+  ]);
+});
+
+test('findAnchorOccurrences: fragments match in order, spanning target lines', () => {
+  const index = buildTargetIndex('alpha and\nomega below\n');
+  assert.deepEqual(findAnchorOccurrences(index, ['alpha', 'omega']), [{ line: 1, endLine: 2 }]);
+  // Reversed order is not a match — ordered containment, not "both present".
+  assert.deepEqual(findAnchorOccurrences(index, ['omega', 'alpha']), []);
+});
+
+// ---- verification: the three outcomes ----------------------------------------
+
+// A target whose lines are spelled out, so the line a finding names can be read
+// straight off the fixture.
+const linesOf = (...lines) => lines.join('\n') + '\n';
+
+const ANCHOR_PHRASE = 'do not treat the committed copy as ground truth';
+
+// A four-line target carrying ANCHOR_PHRASE on line 3.
+const phraseTarget = linesOf(
+  'Refresh refreshable artifacts before diffing against them.',
+  'Surface freshness as an explicit pre-analysis step.',
+  `When a documented refresh command exists, ${ANCHOR_PHRASE}.`,
+  'Treat any mismatch set as provisional.',
+);
+
+test('verification: an anchor inside the cited line range reports nothing', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'plugin/agents/analyst.md', phraseTarget);
+    await writeRepoFile(d, 'docs/notes.md', `See ${cite('analyst.md', '3')} ("${ANCHOR_PHRASE}").\n`);
+  });
+  try {
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verification: an anchor found elsewhere in the target drifts, naming the real line', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'plugin/agents/analyst.md', phraseTarget);
+    await writeRepoFile(d, 'docs/notes.md', `See ${cite('analyst.md', '1')} ("${ANCHOR_PHRASE}").\n`);
+  });
+  try {
+    const findings = await scanPointerAnchors(dir);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].kind, 'pointer-anchor-drift');
+    assert.equal(findings[0].severity, 'error');
+    // file/line are the CITING site, matching principle-citations.mjs's shape.
+    assert.equal(findings[0].file, 'docs/notes.md');
+    assert.equal(findings[0].line, 1);
+    // The correct line is named, in the target's own coordinates, so the
+    // repair is mechanical.
+    assert.ok(findings[0].detail.includes(ptr('plugin/agents/analyst.md', '3')));
+    assert.match(findings[0].detail, /line 3/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verification: an anchor absent from the target entirely is broken, not drifted', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'plugin/agents/analyst.md', phraseTarget);
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      `See ${cite('analyst.md', '3')} ("a sentence this target has never contained").\n`,
+    );
+  });
+  try {
+    const findings = await scanPointerAnchors(dir);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].kind, 'pointer-anchor-broken');
+    assert.equal(findings[0].severity, 'error');
+    assert.equal(findings[0].file, 'docs/notes.md');
+    assert.equal(findings[0].line, 1);
+    assert.match(findings[0].detail, /appears nowhere in/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- verification: the nearest occurrence ------------------------------------
+
+test('verification: drift names the nearest occurrence, above or below the cited line', async () => {
+  // The identifier appears TWICE, on either side of both citations — so a
+  // first-occurrence rule and a last-occurrence rule each get exactly one of
+  // the two answers wrong.
+  const target = linesOf(
+    'const noop = 1;',
+    'const other = 2;',
+    '// renderReport is described up here, far from its definition',
+    ...Array.from({ length: 16 }, (_, i) => `const filler${i} = ${i};`),
+    'export function renderReport() {',
+    '  return null;',
+    '}',
+  );
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'plugin/skills/s/scripts/lib/report.mjs', target);
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      `The definition at ${cite('lib/report.mjs', '17')} — ${span('renderReport')} — moved.\n` +
+        `\nThe comment at ${cite('lib/report.mjs', '6')} — ${span('renderReport')} — moved too.\n`,
+    );
+  });
+  try {
+    // Pin the fixture's own shape first: a drift line asserted against a
+    // miscounted fixture would be a test grading itself.
+    const index = buildTargetIndex(target);
+    assert.deepEqual(
+      findAnchorOccurrences(index, ['renderreport']),
+      [
+        { line: 3, endLine: 3 },
+        { line: 20, endLine: 20 },
+      ],
+    );
+
+    const findings = await scanPointerAnchors(dir);
+    assert.deepEqual(
+      findings.map((f) => [f.kind, f.line]),
+      [
+        ['pointer-anchor-drift', 1],
+        ['pointer-anchor-drift', 3],
+      ],
+    );
+    // Cited 17: 20 is three lines below, 3 is fourteen above — nearest is below.
+    assert.match(findings[0].detail, /line 20/);
+    // Cited 6: 3 is three lines above, 20 is fourteen below — nearest is above.
+    assert.match(findings[1].detail, /line 3/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- verification: elision, wrapping, indentation, emphasis ------------------
+
+test('verification: an elided anchor matches as ordered containment', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(
+      d,
+      'plugin/agents/code-reviewer.md',
+      linesOf(
+        'The checklist (see ADR-0017) is the header.',
+        'It is the fixed target both the validator and this review independently check against.',
+      ),
+    );
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      `See ${cite('code-reviewer.md', '2')} ("the fixed target both … independently check against").\n`,
+    );
+  });
+  try {
+    // The literal quoted string — elision character and all — is nowhere in the
+    // target, so a substring match would report this as broken.
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verification: an elided anchor whose fragments occur out of order is broken', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(
+      d,
+      'plugin/agents/code-reviewer.md',
+      linesOf('The header.', 'independently check against the fixed target both, in that order.'),
+    );
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      `See ${cite('code-reviewer.md', '2')} ("the fixed target both … independently check against").\n`,
+    );
+  });
+  try {
+    const findings = await scanPointerAnchors(dir);
+    assert.deepEqual(
+      findings.map((f) => f.kind),
+      ['pointer-anchor-broken'],
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verification: a target line indented differently from the citation still matches', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(
+      d,
+      'plugin/agents/analyst.md',
+      linesOf('Rules:', `        ${ANCHOR_PHRASE}`, 'End.'),
+    );
+    await writeRepoFile(d, 'docs/notes.md', `See ${cite('analyst.md', '2')} ("${ANCHOR_PHRASE}").\n`);
+  });
+  try {
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verification: an anchor the TARGET wraps across two indented lines still matches', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(
+      d,
+      'plugin/agents/analyst.md',
+      linesOf('Rules:', '  When a refresh command exists, do not treat the', '     committed copy as ground truth.', 'End.'),
+    );
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      // The cited RANGE covers both lines the phrase spans.
+      `See ${cite('analyst.md', '2-3')} ("${ANCHOR_PHRASE}").\n`,
+    );
+  });
+  try {
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verification: emphasis and case in the target do not defeat a match', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(
+      d,
+      'plugin/agents/analyst.md',
+      linesOf('Rules:', 'When a refresh command exists, **do NOT treat** the committed copy as ground truth.'),
+    );
+    await writeRepoFile(d, 'docs/notes.md', `See ${cite('analyst.md', '2')} ("${ANCHOR_PHRASE}").\n`);
+  });
+  try {
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verification: the emphasis-wrapped corpus shape verifies against its target', async () => {
+  // The Part-1 extraction fix carried through to verification: the same
+  // `(*"…"*)` pointer that used to read as carrying no anchor is now checked
+  // against the target, and passes for the right reason.
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(
+      d,
+      'plugin/agents/designer.md',
+      linesOf('Criteria rules:', '  - **Measure the baseline by running the row\'s own command.**', 'End.'),
+    );
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      `owned at ${cite('designer.md', '2')} (*"Measure the baseline by running the row's own command"*);\n`,
+    );
+  });
+  try {
+    const { pointers } = await collectPointers(dir);
+    assert.equal(pointers[0].anchor.text, "Measure the baseline by running the row's own command");
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- verification: the renumber-proof shape ----------------------------------
+
+test('verification: an anchored mention with no line number is conforming', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(
+      d,
+      'plugin/skills/s/scripts/lib/hygiene.mjs',
+      linesOf('const a = 1;', 'const b = 2;', 'export const DEFAULT_EXCLUDE_PATHS = [];'),
+    );
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      // Two citations of one target with the SAME anchor. The positional one
+      // has decayed; the unpositioned one cannot. Only the first is reported —
+      // which is the whole argument the drift finding makes to the author.
+      `Stale: ${cite('hygiene.mjs', '1')}'s ${span('DEFAULT_EXCLUDE_PATHS')} is the default set.\n` +
+        `\nDurable: ${span('hygiene.mjs')}'s ${span('DEFAULT_EXCLUDE_PATHS')} is the default set.\n`,
+    );
+  });
+  try {
+    const findings = await scanPointerAnchors(dir);
+    assert.deepEqual(
+      findings.map((f) => [f.kind, f.line]),
+      [['pointer-anchor-drift', 1]],
+    );
+    assert.match(findings[0].detail, /line 3/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verifyAnchor: with no cited range, present anywhere is conforming and absent is broken', () => {
+  // Exercised directly: the grammar only mints a pointer when a line spec is
+  // written, so an unpositioned anchor reaches verification only from a caller
+  // that supplies one — pinning the rule here keeps it from silently changing.
+  const anchor = extractAnchor(`'s ${span('DEFAULT_EXCLUDE_PATHS')} is the default set.`);
+  const pointer = {
+    file: 'docs/notes.md',
+    line: 1,
+    raw: 'hygiene.mjs',
+    target: 'plugin/skills/s/scripts/lib/hygiene.mjs',
+    ranges: [],
+    resolution: 'resolved',
+    anchor,
+  };
+  assert.equal(verifyAnchor(pointer, linesOf('export const DEFAULT_EXCLUDE_PATHS = [];')), null);
+  assert.equal(verifyAnchor(pointer, linesOf('export const SOMETHING_ELSE = [];')).kind, 'pointer-anchor-broken');
+});
+
+// ---- verification: exemptions and degenerate input ---------------------------
+
+test('verification: an ambiguous pointer with an anchor is never verified', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'a/SKILL.md', phraseTarget);
+    await writeRepoFile(d, 'b/SKILL.md', phraseTarget);
+    await writeRepoFile(d, 'docs/notes.md', `See ${cite('SKILL.md', '1')} ("${ANCHOR_PHRASE}").\n`);
+  });
+  try {
+    // The anchor has drifted in both candidates, but there is no single target
+    // to read — the site already reports its ambiguity.
+    const findings = await scanPointerAnchors(dir);
+    assert.deepEqual(
+      findings.map((f) => f.kind),
+      ['pointer-ambiguous'],
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('verifyAnchors: an unreadable target manufactures no findings', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'plugin/agents/analyst.md', phraseTarget);
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      `First ${cite('analyst.md', '1')} ("${ANCHOR_PHRASE}").\n` +
+        `\nSecond ${cite('analyst.md', '4')} ("${ANCHOR_PHRASE}").\n`,
+    );
+  });
+  try {
+    const { pointers } = await collectPointers(dir);
+    // Positive control: with the target readable, BOTH citations report drift —
+    // so the empty result below is the read failing, not the check being
+    // vacuous.
+    assert.equal((await verifyAnchors(dir, pointers)).length, 2);
+
+    await rm(join(dir, 'plugin/agents/analyst.md'));
+    assert.deepEqual(await verifyAnchors(dir, pointers), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('scanPointerAnchors: a citing root that is absent contributes nothing', async () => {

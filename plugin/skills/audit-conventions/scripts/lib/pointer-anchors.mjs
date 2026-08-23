@@ -3,11 +3,16 @@
 // target can be detected instead of silently misleading a reader.
 //
 // This module selects the citing corpus, parses pointers together with their
-// enclosing delimiters, resolves each cited path to a real file, and extracts
-// the CONTENT ANCHOR the citing prose writes after the pointer. Anchor
-// VERIFICATION — does the anchor actually appear at the cited line? — is a
-// separate, later stage that consumes `collectPointers`' output. Nothing here
-// reads a target's content.
+// enclosing delimiters, resolves each cited path to a real file, extracts the
+// CONTENT ANCHOR the citing prose writes after the pointer, and VERIFIES that
+// anchor against the cited target. Verification has exactly three outcomes:
+// the anchor sits inside the cited line range (silent), it sits elsewhere in
+// the target (`pointer-anchor-drift`, naming the line it is really on), or it
+// is absent from the target entirely (`pointer-anchor-broken`).
+//
+// `collectPointers` stays purely structural — it reads CITING files only —
+// and `verifyAnchors` is the one stage that reads a TARGET's content. The two
+// compose in `scanPointerAnchors`.
 //
 // `(repoRoot, opts = {}) => findings[]` (async, pure — no fs writes), matching
 // the shape of hygiene.mjs's scanners: `{ kind, ok: false, severity, detail }`
@@ -238,8 +243,9 @@ export function matchCandidates(candidates, citedPath) {
 //
 // Between the pointer's closing delimiter and the anchor's opening one, only a
 // CONNECTOR WINDOW may intervene: an optional possessive ('s or ’s), a small
-// amount of whitespace, and at most one connector character. Anything else —
-// or nothing at all — means the pointer carries no anchor.
+// amount of whitespace, at most one connector character, and an optional
+// markdown emphasis marker immediately before the span. Anything else — or
+// nothing at all — means the pointer carries no anchor.
 //
 // The discriminator is what FOLLOWS the connector, never the connector itself.
 // A possessive followed by a backticked identifier is an anchor; the same
@@ -254,9 +260,9 @@ export function matchCandidates(candidates, citedPath) {
 export const ANCHOR_CONNECTORS = ['(', ',', ';', ':', '—', '–'];
 
 // The elision marker. An anchor containing it quotes the target with a gap, so
-// verification (a later stage) must match it as ORDERED CONTAINMENT of the
-// surrounding fragments and never as a literal substring. This stage only
-// records that the elision is present and splits the fragments out.
+// verification below matches it as ORDERED CONTAINMENT of the surrounding
+// fragments and never as a literal substring. This stage only records that the
+// elision is present and splits the fragments out.
 export const ELISION = '…';
 
 // An anchor may span ONE line break. Prose wraps wherever the fill happens to
@@ -270,6 +276,23 @@ export const ANCHOR_LOOKAHEAD_LINES = 1;
 // A small amount of whitespace, optionally crossing a single line break.
 const WS = '[ \\t\\r]*(?:\\n[ \\t\\r]*)?';
 
+// A markdown emphasis marker may wrap the anchor's own delimiters — the corpus
+// writes one anchor as `(*"…"*)`, a quoted span italicized inside its
+// connector parenthesis. The markers are consumed by the grammar rather than
+// stored, so `text` stays the quoted content alone.
+//
+// This is deliberately narrow: exactly one optional marker, immediately before
+// the span's OPENING delimiter. The wrapped shape was measured at ONE
+// occurrence across docs/ and plugin/, which does not justify admitting
+// emphasis at every position in the window.
+//
+// The CLOSING marker needs no rule at all — the match ends at the span's
+// closing delimiter and simply leaves the rest of the tail unread, so a
+// trailing `*` is outside the anchor either way. (An emphasis marker INSIDE
+// the quotes is a third case: it stays in the stored text, and verification
+// strips it from both sides before comparing.)
+const EMPHASIS_SOURCE = '(?:\\*\\*|\\*|__|_)';
+
 // The connector window and the three anchor forms, anchored at offset 0 of the
 // text following `delimiterEnd`.
 const ANCHOR_RE = new RegExp(
@@ -282,6 +305,7 @@ const ANCHOR_RE = new RegExp(
     // are the em/en dash, not ASCII hyphen).
     `([${ANCHOR_CONNECTORS.join('')}])?` +
     WS +
+    `${EMPHASIS_SOURCE}?` + // opening emphasis marker, not captured
     '(?:' +
     '"([^"]+)"' + // (3) straight-quoted span
     '|“([^”]+)”' + // (4) curly-quoted span
@@ -306,11 +330,12 @@ export function normalizeAnchorText(text) {
 //
 // Returns null when no anchor is present, or `{ form, quoteStyle, connector,
 // possessive, text, raw, fragments, hasElision, wrapped, start, end }` where
-// `start`/`end` are offsets into `tail` bounding the anchor INCLUDING its
-// delimiters, and `text` is the normalized inner content.
+// `start`/`end` are offsets into `tail` bounding the anchor INCLUDING its own
+// delimiters but EXCLUDING any emphasis markers wrapping them, and `text` is
+// the normalized inner content.
 //
 // Nothing here reads the cited target: verifying that `text` actually appears
-// at the cited line is a separate, later stage.
+// at the cited line is `verifyAnchor` below.
 export function extractAnchor(tail) {
   const match = ANCHOR_RE.exec(tail);
   if (!match) return null;
@@ -335,6 +360,8 @@ export function extractAnchor(tail) {
 
   // Every form uses a single-character delimiter on each side, so the anchor
   // spans exactly `inner.length + 2` characters ending where the match ends.
+  // An opening emphasis marker sits before `start` and is therefore excluded
+  // from the reported span by the same arithmetic.
   const end = match[0].length;
   const start = end - (inner.length + 2);
   const raw = tail.slice(start, end);
@@ -557,12 +584,248 @@ function summarizeMatches(matches, limit = 3) {
   return `${matches.slice(0, limit).join(', ')}, and ${matches.length - limit} more`;
 }
 
+// ---- verification ------------------------------------------------------------
+
+// Reads the cited target and asks whether the anchor is really there. Three
+// outcomes, and the middle one is what the whole design is for:
+//
+//   - inside the cited line range          → nothing;
+//   - elsewhere in the target              → `pointer-anchor-drift`, NAMING the
+//                                            line the anchor is really on, so
+//                                            the repair is mechanical;
+//   - nowhere in the target                → `pointer-anchor-broken`.
+//
+// A pointer with an anchor and NO line number is fully conforming as long as
+// the anchor is present somewhere in the target. That is the renumber-proof
+// shape the drift finding steers citations toward: with nothing positional to
+// decay, an edit above the cited content cannot invalidate it.
+
+// Markdown emphasis markers are noise for comparison: a target that bolds a
+// phrase the citation quotes plain (or the reverse) still says the same thing,
+// and this repo's prose emphasizes freely.
+//
+// Asterisk runs go unconditionally. An underscore goes only at a word
+// BOUNDARY, so an INTRA-word underscore survives: `DEFAULT_EXCLUDE_PATHS` stays
+// itself instead of collapsing into a letter run that would then also equal a
+// different identifier spelled without the underscores. A boundary underscore
+// on an identifier (a leading `__` on a dunder name) is stripped like any other
+// emphasis opener — harmless, because both sides get exactly this treatment and
+// the text a finding quotes back is the stored anchor text, never this form.
+export function stripEmphasisMarkers(text) {
+  return text
+    .replace(/\*{1,3}/g, '')
+    .replace(/(^|[^A-Za-z0-9_])_{1,2}(?=[^\s_])/g, '$1')
+    .replace(/(?<=[^\s_])_{1,2}(?=[^A-Za-z0-9_]|$)/g, '');
+}
+
+// The comparison form, applied IDENTICALLY to both sides. Whitespace runs are
+// squeezed (an anchor wraps mid-phrase in the citing prose, and the target's
+// own line may be indented — neither may defeat a match), case is folded, and
+// emphasis markers are stripped.
+export function normalizeForMatch(text) {
+  return stripEmphasisMarkers(text).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+// Flattens a target into one normalized string plus a sorted offset→line map.
+//
+// Flattening rather than comparing line by line is what lets an anchor match
+// text the TARGET wraps across lines, which is the mirror of the wrap the
+// citing side already tolerates. Each line is normalized on its own — so its
+// leading indentation is gone before the join — and the lines are joined with
+// a single space, so a phrase broken across two target lines reads as one
+// space-separated phrase here. Blank lines contribute nothing.
+export function buildTargetIndex(content) {
+  const lines = content.split(/\r?\n/);
+  let text = '';
+  const marks = [];
+  for (let index = 0; index < lines.length; index++) {
+    const normalized = normalizeForMatch(lines[index]);
+    if (normalized === '') continue;
+    if (text !== '') text += ' ';
+    marks.push({ offset: text.length, line: index + 1 });
+    text += normalized;
+  }
+  return { text, marks };
+}
+
+function lineAtOffset(marks, offset) {
+  if (marks.length === 0) return 0;
+  let low = 0;
+  let high = marks.length - 1;
+  let line = marks[0].line;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (marks[mid].offset <= offset) {
+      line = marks[mid].line;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return line;
+}
+
+// Every place the anchor's fragments occur in order, as `{ line, endLine }`.
+//
+// ORDERED CONTAINMENT, never a literal substring: an elided anchor quotes the
+// target with a gap, and the elided text is by definition not reproduced in the
+// citation. A single-fragment anchor is the degenerate case of the same rule.
+export function findAnchorOccurrences(index, fragments) {
+  const occurrences = [];
+  if (fragments.length === 0) return occurrences;
+
+  const [first, ...rest] = fragments;
+  let from = 0;
+  for (;;) {
+    const start = index.text.indexOf(first, from);
+    if (start === -1) break;
+
+    let cursor = start + first.length;
+    let complete = true;
+    for (const fragment of rest) {
+      const at = index.text.indexOf(fragment, cursor);
+      if (at === -1) {
+        complete = false;
+        break;
+      }
+      cursor = at + fragment.length;
+    }
+    // A later occurrence of the first fragment starts its own search even
+    // further along, so a tail that failed here cannot succeed there.
+    if (!complete) break;
+
+    occurrences.push({
+      line: lineAtOffset(index.marks, start),
+      endLine: lineAtOffset(index.marks, cursor - 1),
+    });
+    from = start + 1;
+  }
+  return occurrences;
+}
+
+// An occurrence satisfies the citation when the lines it SPANS intersect any
+// cited range — a phrase that begins on the line before the cited one and runs
+// through it is at the cited line, not drifted from it.
+function occursWithin(occurrence, ranges) {
+  return ranges.some((range) => occurrence.line <= range.end && occurrence.endLine >= range.start);
+}
+
+function distanceToRanges(occurrence, ranges) {
+  return Math.min(
+    ...ranges.map((range) =>
+      occurrence.endLine < range.start
+        ? range.start - occurrence.endLine
+        : occurrence.line - range.end,
+    ),
+  );
+}
+
+// The NEAREST occurrence to the cited range, not the first in the file.
+//
+// Load-bearing on real data: this repo cites an identifier two lines above its
+// definition, while the same name also appears in a section comment forty-odd
+// lines earlier. A first-occurrence rule names that comment, turning a
+// two-line repair into a forty-line one in the wrong direction — a "fix" that
+// moves a nearly-right pointer badly wrong. Ties keep the earlier occurrence,
+// since the scan is ordered and the comparison is strict.
+function nearestOccurrence(occurrences, ranges) {
+  let nearest = occurrences[0];
+  let shortest = distanceToRanges(nearest, ranges);
+  for (const occurrence of occurrences.slice(1)) {
+    const distance = distanceToRanges(occurrence, ranges);
+    if (distance < shortest) {
+      nearest = occurrence;
+      shortest = distance;
+    }
+  }
+  return nearest;
+}
+
+// Verifies one pointer's anchor against its target's `content`. Returns a
+// finding or null. Pure — the caller owns the read.
+export function verifyAnchor(pointer, content) {
+  const { anchor } = pointer;
+  if (anchor == null) return null;
+
+  const fragments = anchor.fragments.map(normalizeForMatch).filter((f) => f !== '');
+  // An anchor that normalizes away entirely (emphasis markers and nothing
+  // else) claims nothing about the target and is not evidence of decay.
+  if (fragments.length === 0) return null;
+
+  const occurrences = findAnchorOccurrences(buildTargetIndex(content), fragments);
+  const site = `${pointer.file}:${pointer.line}`;
+  const quoted = anchor.form === 'backticked' ? `\`${anchor.text}\`` : `"${anchor.text}"`;
+
+  if (occurrences.length === 0) {
+    return {
+      kind: 'pointer-anchor-broken',
+      ok: false,
+      severity: 'error',
+      detail:
+        `${site} cites '${pointer.raw}' with anchor ${quoted}, which appears nowhere in ` +
+        `${pointer.target} — the cited content was rewritten or removed, so re-read the ` +
+        'target and rewrite the citation around what is there now',
+      file: pointer.file,
+      line: pointer.line,
+    };
+  }
+
+  const ranges = pointer.ranges ?? [];
+  if (ranges.length === 0) return null; // anchored, unpositioned — nothing to drift
+  if (occurrences.some((occurrence) => occursWithin(occurrence, ranges))) return null;
+
+  const nearest = nearestOccurrence(occurrences, ranges);
+  return {
+    kind: 'pointer-anchor-drift',
+    ok: false,
+    severity: 'error',
+    detail:
+      `${site} cites '${pointer.raw}' but its anchor ${quoted} is at ` +
+      `${pointer.target}:${nearest.line}, not in the cited range — repoint it to ` +
+      `line ${nearest.line}, or drop the line number and keep the anchor so the ` +
+      'citation cannot decay again',
+    file: pointer.file,
+    line: pointer.line,
+  };
+}
+
+// Verifies every anchored, resolved pointer, reading each distinct target once.
+//
+// Degenerate input never manufactures findings: a target that cannot be read
+// contributes nothing at all rather than one "broken anchor" per citation of
+// it — the same discipline principle-citations.mjs applies when its own
+// reference doc fails to parse, where one root cause must not surface as
+// dozens of findings that mask it. A pointer that is unresolved, ambiguous or
+// an orphan continuation is exempt for the same reason it is exempt from the
+// anchor-missing check: it already reports at that site, and there is no
+// single target to read.
+export async function verifyAnchors(repoRoot, pointers) {
+  const findings = [];
+  const contents = new Map();
+
+  for (const pointer of pointers) {
+    if (pointer.resolution !== 'resolved' || pointer.anchor == null) continue;
+    if (pointer.target == null) continue;
+
+    if (!contents.has(pointer.target)) {
+      contents.set(pointer.target, await safeReadFile(join(repoRoot, pointer.target)));
+    }
+    const content = contents.get(pointer.target);
+    if (content == null) continue;
+
+    const finding = verifyAnchor(pointer, content);
+    if (finding != null) findings.push(finding);
+  }
+
+  return findings;
+}
+
 // ---- scanPointerAnchors ------------------------------------------------------
 
 // `opts` is accepted for signature parity with hygiene.mjs's scanners and is
 // forwarded to `collectPointers`; this stage has no configurable behaviour of
 // its own, since the corpus decisions above are contract, not preference.
 export async function scanPointerAnchors(repoRoot, opts = {}) {
-  const { findings } = await collectPointers(repoRoot, opts);
-  return findings;
+  const { pointers, findings } = await collectPointers(repoRoot, opts);
+  return [...findings, ...(await verifyAnchors(repoRoot, pointers))];
 }
