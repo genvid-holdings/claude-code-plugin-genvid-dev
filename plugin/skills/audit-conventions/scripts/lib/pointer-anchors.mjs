@@ -2,11 +2,12 @@
 // prose and code comments, so a pointer that has decayed against a moved
 // target can be detected instead of silently misleading a reader.
 //
-// This module is the FIRST stage only: it selects the citing corpus, parses
-// pointers together with their enclosing delimiters, and resolves each cited
-// path to a real file. Anchor extraction and anchor verification are separate,
-// later stages that consume `collectPointers`' output — nothing here reads a
-// target's content.
+// This module selects the citing corpus, parses pointers together with their
+// enclosing delimiters, resolves each cited path to a real file, and extracts
+// the CONTENT ANCHOR the citing prose writes after the pointer. Anchor
+// VERIFICATION — does the anchor actually appear at the cited line? — is a
+// separate, later stage that consumes `collectPointers`' output. Nothing here
+// reads a target's content.
 //
 // `(repoRoot, opts = {}) => findings[]` (async, pure — no fs writes), matching
 // the shape of hygiene.mjs's scanners: `{ kind, ok: false, severity, detail }`
@@ -146,9 +147,9 @@ export function parseLineSpec(spec) {
 //
 // Each returned pointer records where its ENCLOSING DELIMITER ends, not merely
 // where its own text ends. That distinction is the whole point of parsing the
-// delimiter alongside the pointer: a later stage looks for a content anchor
-// AFTER the pointer, and a grammar that stopped at the pointer's last digit
-// would read the pointer's own closing backtick as an anchor's opening
+// delimiter alongside the pointer: anchor extraction below looks for a content
+// anchor AFTER the pointer, and a grammar that stopped at the pointer's last
+// digit would read the pointer's own closing backtick as an anchor's opening
 // delimiter — inferring connective prose as if it were quoted target text.
 //
 // Returns `[{ raw, citedPath, lineSpec, ranges, start, end, delimiterStart,
@@ -220,6 +221,198 @@ export function matchCandidates(candidates, citedPath) {
   return candidates.filter((f) => f === citedPath || f.endsWith(suffix));
 }
 
+// ---- anchors -----------------------------------------------------------------
+
+// A CONTENT ANCHOR is the fragment of the TARGET that the citing prose writes
+// immediately after the pointer. It is what makes a positional citation
+// checkable at all: the line number says where to look, and the anchor says
+// what should be found there. A pointer carrying no anchor decays silently,
+// because a stale line number still resolves to a real — merely unrelated —
+// line.
+//
+// Exactly three forms are recognized, and the list is closed on purpose:
+//
+//   1. a double-quoted span — straight "…" or curly “…”;
+//   2. a backticked identifier — `someIdentifier`;
+//   3. a colon-introduced quoted span — : "…".
+//
+// Between the pointer's closing delimiter and the anchor's opening one, only a
+// CONNECTOR WINDOW may intervene: an optional possessive ('s or ’s), a small
+// amount of whitespace, and at most one connector character. Anything else —
+// or nothing at all — means the pointer carries no anchor.
+//
+// The discriminator is what FOLLOWS the connector, never the connector itself.
+// A possessive followed by a backticked identifier is an anchor; the same
+// possessive followed by ordinary prose is not, and both shapes occur live in
+// this repo within a few files of each other.
+//
+// Extraction starts at the pointer's `delimiterEnd` rather than searching the
+// pointer's neighbourhood. That anchoring is the whole reason the grammar
+// tracks delimiters: a proximity search was measured during design and
+// produced roughly 40 "anchors" that were only connective prose (`" and "`,
+// `"); a "`), while false-passing two genuinely stale pointers.
+export const ANCHOR_CONNECTORS = ['(', ',', ';', ':', '—', '–'];
+
+// The elision marker. An anchor containing it quotes the target with a gap, so
+// verification (a later stage) must match it as ORDERED CONTAINMENT of the
+// surrounding fragments and never as a literal substring. This stage only
+// records that the elision is present and splits the fragments out.
+export const ELISION = '…';
+
+// An anchor may span ONE line break. Prose wraps wherever the fill happens to
+// put it, and the corpus carries anchors broken mid-phrase whose continuation
+// line arrives INDENTED — which is also why anchor text is stored with runs of
+// whitespace squeezed rather than with newlines merely swapped for spaces. A
+// swap alone leaves the continuation's indentation in the text and a
+// single-space comparison then fails against a byte-correct target.
+export const ANCHOR_LOOKAHEAD_LINES = 1;
+
+// A small amount of whitespace, optionally crossing a single line break.
+const WS = '[ \\t\\r]*(?:\\n[ \\t\\r]*)?';
+
+// The connector window and the three anchor forms, anchored at offset 0 of the
+// text following `delimiterEnd`.
+const ANCHOR_RE = new RegExp(
+  '^' +
+    "(['’]s)?" + // (1) possessive
+    WS +
+    // (2) at most one connector character. The class is built from
+    // ANCHOR_CONNECTORS so the exported list cannot drift from the grammar;
+    // none of its members needs escaping inside a character class (the dashes
+    // are the em/en dash, not ASCII hyphen).
+    `([${ANCHOR_CONNECTORS.join('')}])?` +
+    WS +
+    '(?:' +
+    '"([^"]+)"' + // (3) straight-quoted span
+    '|“([^”]+)”' + // (4) curly-quoted span
+    '|`([^`\\n]+)`' + // (5) backticked identifier
+    ')',
+);
+
+// A backticked anchor must be IDENTIFIER-shaped: no whitespace, no slash, no
+// colon. Without this the backticked span sitting after a comma in a run of
+// sibling citations would be read as an anchor for the pointer before it —
+// exactly the artifact class the delimiter anchoring exists to exclude.
+const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\))?$/;
+
+// Squeezes RUNS of whitespace to a single space. Squeezing rather than
+// replacing is load-bearing — see ANCHOR_LOOKAHEAD_LINES above.
+export function normalizeAnchorText(text) {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+// Extracts the anchor from `tail` — the text that follows a pointer's closing
+// delimiter, which may include the following source line joined with a '\n'.
+//
+// Returns null when no anchor is present, or `{ form, quoteStyle, connector,
+// possessive, text, raw, fragments, hasElision, wrapped, start, end }` where
+// `start`/`end` are offsets into `tail` bounding the anchor INCLUDING its
+// delimiters, and `text` is the normalized inner content.
+//
+// Nothing here reads the cited target: verifying that `text` actually appears
+// at the cited line is a separate, later stage.
+export function extractAnchor(tail) {
+  const match = ANCHOR_RE.exec(tail);
+  if (!match) return null;
+
+  const [, possessive, connector, straight, curly, backticked] = match;
+
+  let form;
+  let quoteStyle;
+  let inner;
+  if (backticked !== undefined) {
+    if (!IDENTIFIER_RE.test(backticked)) return null;
+    form = 'backticked';
+    quoteStyle = null;
+    inner = backticked;
+  } else {
+    inner = straight !== undefined ? straight : curly;
+    quoteStyle = straight !== undefined ? 'straight' : 'curly';
+    // Form (3) is form (1) reached through a colon connector; naming it
+    // separately keeps the three declared forms distinguishable downstream.
+    form = connector === ':' ? 'colon-quoted' : 'quoted';
+  }
+
+  // Every form uses a single-character delimiter on each side, so the anchor
+  // spans exactly `inner.length + 2` characters ending where the match ends.
+  const end = match[0].length;
+  const start = end - (inner.length + 2);
+  const raw = tail.slice(start, end);
+
+  const text = normalizeAnchorText(inner);
+  const fragments = text
+    .split(ELISION)
+    .map(normalizeAnchorText)
+    .filter((fragment) => fragment !== '');
+  // An anchor that normalizes away to nothing (whitespace only, or a bare
+  // elision) carries no claim about the target and is not an anchor.
+  if (fragments.length === 0) return null;
+
+  return {
+    form,
+    quoteStyle,
+    connector: connector === undefined ? null : connector,
+    possessive: possessive !== undefined,
+    text,
+    raw,
+    fragments,
+    hasElision: text.includes(ELISION),
+    wrapped: raw.includes('\n'),
+    start,
+    end,
+  };
+}
+
+// Builds the search text for one pointer: the remainder of its own line after
+// `delimiterEnd`, plus up to ANCHOR_LOOKAHEAD_LINES following lines.
+//
+// A following line is only joined when it is CONTIGUOUS (no gap in line
+// numbers, which is how `iterateUnfencedLines` surfaces an intervening fenced
+// block) and non-blank, since a blank line ends the paragraph.
+//
+// Returned as segments rather than a bare string so an offset into the joined
+// text can be mapped back to a real line and column for the next stage.
+function buildAnchorTail(lines, index, delimiterEnd) {
+  const segments = [
+    {
+      lineNumber: lines[index].lineNumber,
+      columnOffset: delimiterEnd,
+      text: lines[index].text.slice(delimiterEnd),
+    },
+  ];
+  for (let step = 1; step <= ANCHOR_LOOKAHEAD_LINES; step++) {
+    const next = lines[index + step];
+    if (!next) break;
+    if (next.lineNumber !== lines[index + step - 1].lineNumber + 1) break;
+    if (next.text.trim() === '') break;
+    segments.push({ lineNumber: next.lineNumber, columnOffset: 0, text: next.text });
+  }
+  return segments;
+}
+
+function locateOffset(segments, offset) {
+  let cursor = 0;
+  for (const segment of segments) {
+    if (offset <= cursor + segment.text.length) {
+      return { line: segment.lineNumber, column: segment.columnOffset + (offset - cursor) };
+    }
+    cursor += segment.text.length + 1; // the joining newline
+  }
+  const last = segments[segments.length - 1];
+  return { line: last.lineNumber, column: last.columnOffset + last.text.length };
+}
+
+// Attaches `anchor` to a parsed pointer, resolved to real line/column
+// coordinates. Returns null when the pointer carries no anchor.
+function anchorForPointer(lines, index, delimiterEnd) {
+  const segments = buildAnchorTail(lines, index, delimiterEnd);
+  const anchor = extractAnchor(segments.map((s) => s.text).join('\n'));
+  if (!anchor) return null;
+  const from = locateOffset(segments, anchor.start);
+  const to = locateOffset(segments, anchor.end);
+  return { ...anchor, line: from.line, column: from.column, endLine: to.line, endColumn: to.column };
+}
+
 // ---- collectPointers ---------------------------------------------------------
 
 // Walks the citing corpus and returns every pointer found, each resolved
@@ -234,6 +427,13 @@ export function matchCandidates(candidates, citedPath) {
 // A continuation inherits its predecessor's resolution outcome and never
 // reports an unresolved/ambiguous finding of its own — the path is written once
 // and would otherwise be reported once per continuation that trails it.
+//
+// Anchors: every pointer gets `anchor` set to its extracted anchor or to null,
+// and a resolved pointer with no anchor reports `pointer-anchor-missing`. A
+// continuation is checked like any other pointer — it makes its own positional
+// claim about a line, so it needs its own anchor. A pointer that did NOT
+// resolve is exempt: it already reports a finding at that site, and an anchor
+// cannot be held against a target that could not be identified.
 export async function collectPointers(repoRoot, opts = {}) {
   const candidates = await listTargetCandidates(repoRoot);
   const citingFiles = await listCitingFiles(repoRoot);
@@ -245,11 +445,32 @@ export async function collectPointers(repoRoot, opts = {}) {
     const content = await safeReadFile(join(repoRoot, relPath));
     if (content == null) continue;
 
+    // Materialized rather than streamed: anchor extraction needs to look at
+    // the FOLLOWING line, because an anchor may wrap across a line break.
+    const lines = [...iterateUnfencedLines(content)];
+
     let previousLineNumber = 0;
     let paragraph = 0;
     let lastResolved = null;
 
-    for (const { lineNumber, text } of iterateUnfencedLines(content)) {
+    const noteMissingAnchor = (pointer) => {
+      if (pointer.anchor != null || pointer.resolution !== 'resolved') return;
+      findings.push({
+        kind: 'pointer-anchor-missing',
+        ok: false,
+        severity: 'error',
+        detail:
+          `${pointer.file}:${pointer.line} cites '${pointer.raw}' with no content anchor — ` +
+          'follow the pointer with a quoted span, a backticked identifier, or a ' +
+          'colon-introduced quotation naming what the cited line should contain, so the ' +
+          'citation can be checked instead of silently decaying',
+        file: pointer.file,
+        line: pointer.line,
+      });
+    };
+
+    for (let index = 0; index < lines.length; index++) {
+      const { lineNumber, text } = lines[index];
       if (lineNumber !== previousLineNumber + 1 || text.trim() === '') {
         paragraph += 1;
         lastResolved = null;
@@ -265,6 +486,7 @@ export async function collectPointers(repoRoot, opts = {}) {
           paragraph,
           target: null,
           resolution: 'resolved',
+          anchor: anchorForPointer(lines, index, parsed.delimiterEnd),
         };
 
         if (parsed.isContinuation) {
@@ -285,6 +507,7 @@ export async function collectPointers(repoRoot, opts = {}) {
             pointer.target = lastResolved.target;
             pointer.resolution = lastResolved.resolution;
           }
+          noteMissingAnchor(pointer);
           pointers.push(pointer);
           continue;
         }
@@ -319,6 +542,7 @@ export async function collectPointers(repoRoot, opts = {}) {
           });
         }
 
+        noteMissingAnchor(pointer);
         lastResolved = pointer;
         pointers.push(pointer);
       }
