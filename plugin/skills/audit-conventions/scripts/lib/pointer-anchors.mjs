@@ -12,16 +12,21 @@
 //
 // `collectPointers` stays purely structural — it reads CITING files only —
 // and `verifyAnchors` is the one stage that reads a TARGET's content. The two
-// compose in `scanPointerAnchors`.
+// compose in `scanPointerAnchors`, which then applies the RATCHET: a repo-root
+// baseline of accepted debt, so the checker can run at `error` severity against
+// a corpus that does not conform yet. See the baseline section at the foot of
+// this file.
 //
 // `(repoRoot, opts = {}) => findings[]` (async, pure — no fs writes), matching
 // the shape of hygiene.mjs's scanners: `{ kind, ok: false, severity, detail }`
 // plus `file`/`line`, since every finding is anchored to a specific citation
-// site.
+// site. Findings additionally carry `pointer`/`occurrence`/`digest`, which is
+// what the baseline keys and compares against — see `baselineKey`.
 //
 // Degenerate input never manufactures findings: a missing citing root, an
 // unreadable file, or a repo with no matching files all contribute nothing.
 
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
@@ -40,8 +45,10 @@ import { iterateUnfencedLines } from './md-scan.mjs';
 //     line, and several of those pointers occur nowhere else in the repo, so
 //     excluding the changelog would leave them unchecked.
 //   - `.json` is deliberately NOT a citing type. Pointer strings are stored in
-//     JSON — a ratchet baseline, test fixtures — precisely so that recording a
-//     pointer does not mint a new one, and so the baseline cannot scan itself.
+//     JSON — the ratchet baseline below, test fixtures — precisely so that
+//     recording a pointer does not mint a new one, and so the baseline cannot
+//     scan itself. (The baseline is doubly out of reach: it also sits at the
+//     repo root, which is neither of the two citing roots.)
 export const CITING_ROOTS = ['docs', 'plugin'];
 export const CITING_EXTENSIONS = ['.md', '.mjs'];
 
@@ -461,6 +468,12 @@ function anchorForPointer(lines, index, delimiterEnd) {
 // claim about a line, so it needs its own anchor. A pointer that did NOT
 // resolve is exempt: it already reports a finding at that site, and an anchor
 // cannot be held against a target that could not be identified.
+//
+// Occurrence index: every pointer records its ordinal among pointers with the
+// IDENTICAL raw text in the same citing file, and every finding carries that
+// ordinal plus the raw text. Together with the citing path they form the
+// baseline key (see `baselineKey`) — deliberately NOT the citing line number,
+// so an accepted pointer survives its own document being renumbered.
 export async function collectPointers(repoRoot, opts = {}) {
   const candidates = await listTargetCandidates(repoRoot);
   const citingFiles = await listCitingFiles(repoRoot);
@@ -479,6 +492,7 @@ export async function collectPointers(repoRoot, opts = {}) {
     let previousLineNumber = 0;
     let paragraph = 0;
     let lastResolved = null;
+    const occurrences = new Map();
 
     const noteMissingAnchor = (pointer) => {
       if (pointer.anchor != null || pointer.resolution !== 'resolved') return;
@@ -493,6 +507,8 @@ export async function collectPointers(repoRoot, opts = {}) {
           'citation can be checked instead of silently decaying',
         file: pointer.file,
         line: pointer.line,
+        pointer: pointer.raw,
+        occurrence: pointer.occurrence,
       });
     };
 
@@ -505,12 +521,15 @@ export async function collectPointers(repoRoot, opts = {}) {
       previousLineNumber = lineNumber;
 
       for (const parsed of parsePointersInLine(text)) {
+        const occurrence = occurrences.get(parsed.raw) ?? 0;
+        occurrences.set(parsed.raw, occurrence + 1);
         const pointer = {
           ...parsed,
           file: relPath,
           line: lineNumber,
           lineText: text,
           paragraph,
+          occurrence,
           target: null,
           resolution: 'resolved',
           anchor: anchorForPointer(lines, index, parsed.delimiterEnd),
@@ -528,6 +547,8 @@ export async function collectPointers(repoRoot, opts = {}) {
                 'path-bearing pointer earlier in the same paragraph to attach it to',
               file: relPath,
               line: lineNumber,
+              pointer: parsed.raw,
+              occurrence,
             });
           } else {
             pointer.citedPath = lastResolved.citedPath;
@@ -553,6 +574,8 @@ export async function collectPointers(repoRoot, opts = {}) {
               `matches the path '${parsed.citedPath}'`,
             file: relPath,
             line: lineNumber,
+            pointer: parsed.raw,
+            occurrence,
           });
         } else {
           pointer.resolution = 'ambiguous';
@@ -566,6 +589,8 @@ export async function collectPointers(repoRoot, opts = {}) {
               'leading path segments to name exactly one',
             file: relPath,
             line: lineNumber,
+            pointer: parsed.raw,
+            occurrence,
           });
         }
 
@@ -767,6 +792,8 @@ export function verifyAnchor(pointer, content) {
         'target and rewrite the citation around what is there now',
       file: pointer.file,
       line: pointer.line,
+      pointer: pointer.raw,
+      occurrence: pointer.occurrence,
     };
   }
 
@@ -786,6 +813,8 @@ export function verifyAnchor(pointer, content) {
       'citation cannot decay again',
     file: pointer.file,
     line: pointer.line,
+    pointer: pointer.raw,
+    occurrence: pointer.occurrence,
   };
 }
 
@@ -820,12 +849,241 @@ export async function verifyAnchors(repoRoot, pointers) {
   return findings;
 }
 
+// ---- the ratchet: accepted debt ----------------------------------------------
+
+// Every check above runs at `error` severity, and this repo's corpus does not
+// conform yet. The severity and the ratchet are ONE decision, not two: a corpus
+// with three digits of findings cannot ship at `error` without a baseline, and
+// a baseline is pointless without `error`, since a `warning` never blocks
+// anything and so never ratchets.
+//
+// The baseline is a repo-root file, NOT a file under `plugin/`. `plugin/` is
+// the published git-subdir that ships to consumers; which of *this* repo's own
+// citations are accepted debt is a repo-private fact and must not travel.
+//
+// Its ABSENCE is the loud state, not the quiet one: with no baseline every
+// non-conforming pointer is reported, so nothing has to be done to reach red. A
+// baseline that is unreadable or malformed is treated exactly like an absent
+// one, which fails in the same safe direction — a corrupt ratchet suppresses
+// nothing rather than silently accepting everything.
+export const BASELINE_FILE = '.pointer-baseline.json';
+
+// A short digest is enough: it is compared for equality against a value written
+// by the same code, never brute-forced.
+export const DIGEST_LENGTH = 12;
+
+// The identity of an accepted pointer: its CITING FILE, its RAW POINTER TEXT,
+// and its ORDINAL among identical raw pointers in that file.
+//
+// The citing LINE NUMBER is deliberately absent. An accepted pointer must
+// survive its own document being renumbered — inserting a paragraph above a
+// baselined citation moves it without changing anything about the claim it
+// makes — and keying on the line number would re-fire the whole ratchet on
+// every edit, which is precisely the decay this tool exists to catch elsewhere.
+//
+// The FINDING KIND is also absent from the key, and is recorded on an entry for
+// legibility only: an entry names one pointer's accepted state, and a reader
+// pruning the file needs to see what was accepted without re-running the scan.
+// The three parts are joined on NUL rather than on any printable character,
+// so no path or pointer text that happens to contain the separator can make
+// two different keys collide.
+export function baselineKey({ file, pointer, occurrence }) {
+  return [file, pointer, occurrence ?? 0].join('\u0000');
+}
+
+// A digest of the NORMALIZED text of the cited range in the TARGET.
+//
+// This is what stops the ratchet rotting. An accepted entry does not say "this
+// pointer is fine forever"; it says "this pointer, against this content". If
+// the target is later rewritten under an accepted pointer, the digest moves and
+// the entry re-fires — even though no anchor broke, and even for a pointer that
+// carries no anchor at all to break. Without it, baselining the 103 anchorless
+// pointers would freeze them against arbitrary future edits of their targets.
+//
+// `normalizeForMatch` is the normalization on purpose, the same form anchor
+// verification compares in: a change the verifier would consider immaterial
+// (case, emphasis, indentation, wrapping) is immaterial here too.
+//
+// Returns null when there is nothing to digest — no target, no cited range, or
+// a range wholly outside the target. Null is not an error; it is the null-target
+// case below, and it never drifts.
+export function digestCitedRange(content, ranges) {
+  if (typeof content !== 'string' || !Array.isArray(ranges) || ranges.length === 0) return null;
+  const lines = content.split(/\r?\n/);
+  const parts = [];
+  for (const range of ranges) {
+    for (let number = range.start; number <= range.end; number++) {
+      const line = lines[number - 1];
+      if (line === undefined) continue;
+      parts.push(normalizeForMatch(line));
+    }
+  }
+  if (parts.length === 0) return null;
+  return createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, DIGEST_LENGTH);
+}
+
+// Reads the baseline. `{ present, entries }` — `present: false` for absent,
+// unreadable, malformed, or structurally wrong, all of which suppress nothing.
+//
+// Accepts either a bare array of entries or `{ entries: [...] }`, so the file
+// can carry a `version`/comment envelope without the reader caring.
+export async function loadBaseline(repoRoot, opts = {}) {
+  const name = opts.baselineFile ?? BASELINE_FILE;
+  const raw = await safeReadFile(join(repoRoot, name));
+  if (raw == null) return { present: false, entries: [] };
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { present: false, entries: [] };
+  }
+
+  const rows = Array.isArray(parsed)
+    ? parsed
+    : parsed != null && Array.isArray(parsed.entries)
+      ? parsed.entries
+      : null;
+  if (rows == null) return { present: false, entries: [] };
+
+  const entries = rows
+    .filter((row) => row != null && typeof row.file === 'string' && typeof row.pointer === 'string')
+    .map((row) => ({
+      file: row.file,
+      pointer: row.pointer,
+      occurrence: Number.isInteger(row.occurrence) ? row.occurrence : 0,
+      kind: typeof row.kind === 'string' ? row.kind : null,
+      digest: typeof row.digest === 'string' ? row.digest : null,
+    }));
+  return { present: true, entries };
+}
+
+// Applies the baseline to a scan's findings. Pure — the caller owns both reads.
+//
+// Four outcomes, and the last two are the ratchet:
+//
+//   - baseline absent                    → every finding passes through;
+//   - matched, digest unchanged          → suppressed;
+//   - matched, digest CHANGED            → `pointer-baseline-drifted`, because
+//                                          the target moved under an accepted
+//                                          pointer and the acceptance no longer
+//                                          describes what is there;
+//   - entry matched by NOTHING           → `pointer-baseline-stale`, because
+//                                          the pointer was fixed or deleted and
+//                                          the entry must be pruned or it will
+//                                          silently re-accept a future pointer
+//                                          that lands on the same key.
+//
+// THE NULL-TARGET CASE. An ambiguous, unresolved or orphan-continuation finding
+// has no single target, hence no cited range and no digest. Such findings are
+// still fully STORABLE — 32 of this repo's 138 findings today — and
+// they are suppressed on a key match like any other. They can never fire
+// `pointer-baseline-drifted`, because there is nothing to compare: a drift
+// verdict requires two digests, and a missing digest on EITHER side means the
+// comparison is not available rather than failed.
+export function applyBaseline(findings, baseline) {
+  if (baseline == null || !baseline.present) return findings;
+
+  const byKey = new Map(baseline.entries.map((entry) => [baselineKey(entry), entry]));
+  const matched = new Set();
+  const kept = [];
+
+  for (const finding of findings) {
+    const key = baselineKey(finding);
+    const entry = byKey.get(key);
+    if (entry === undefined) {
+      kept.push(finding);
+      continue;
+    }
+    matched.add(key);
+
+    if (entry.digest == null || finding.digest == null) continue;
+    if (entry.digest === finding.digest) continue;
+
+    kept.push({
+      kind: 'pointer-baseline-drifted',
+      ok: false,
+      severity: 'error',
+      detail:
+        `${finding.file}:${finding.line} accepts '${finding.pointer}' in ${BASELINE_FILE}, but ` +
+        `the content it cites has changed since the baseline was taken (${entry.digest} → ` +
+        `${finding.digest}) — the acceptance no longer describes the cited lines, so re-read ` +
+        'the target and either repair the citation or re-take the baseline entry',
+      file: finding.file,
+      line: finding.line,
+      pointer: finding.pointer,
+      occurrence: finding.occurrence,
+      digest: finding.digest,
+      baselineDigest: entry.digest,
+    });
+  }
+
+  for (const entry of baseline.entries) {
+    if (matched.has(baselineKey(entry))) continue;
+    kept.push({
+      kind: 'pointer-baseline-stale',
+      ok: false,
+      severity: 'error',
+      detail:
+        `${BASELINE_FILE} accepts '${entry.pointer}' in ${entry.file}, but the current scan ` +
+        'reports nothing there — the pointer was repaired or removed, so prune the entry, ' +
+        'or the ratchet will silently re-accept the next pointer that lands on the same key',
+      file: entry.file,
+      pointer: entry.pointer,
+      occurrence: entry.occurrence,
+      digest: null,
+    });
+  }
+
+  return kept;
+}
+
+// Attaches each finding's target digest, reading every distinct target once.
+//
+// Digests are computed whether or not a baseline exists, so the generator that
+// WRITES the baseline can take them straight off a plain scan rather than
+// duplicating the keying and hashing rules that live here.
+async function attachDigests(repoRoot, findings, pointers) {
+  const byKey = new Map(
+    pointers.map((pointer) => [
+      baselineKey({ file: pointer.file, pointer: pointer.raw, occurrence: pointer.occurrence }),
+      pointer,
+    ]),
+  );
+  const contents = new Map();
+  const out = [];
+
+  for (const finding of findings) {
+    const pointer = byKey.get(baselineKey(finding));
+    let digest = null;
+    let target = null;
+    if (pointer != null && pointer.resolution === 'resolved' && pointer.target != null) {
+      target = pointer.target;
+      if (!contents.has(target)) {
+        contents.set(target, await safeReadFile(join(repoRoot, target)));
+      }
+      digest = digestCitedRange(contents.get(target), pointer.ranges);
+    }
+    out.push({ ...finding, target, digest });
+  }
+
+  return out;
+}
+
 // ---- scanPointerAnchors ------------------------------------------------------
 
-// `opts` is accepted for signature parity with hygiene.mjs's scanners and is
-// forwarded to `collectPointers`; this stage has no configurable behaviour of
-// its own, since the corpus decisions above are contract, not preference.
+// `opts` is forwarded to `collectPointers` for signature parity with
+// hygiene.mjs's scanners; the corpus decisions above are contract, not
+// preference, so nothing there is configurable. Two options ARE read here, both
+// about the ratchet rather than the checking:
+//
+//   - `baselineFile` — the baseline's path, relative to `repoRoot`;
+//   - `useBaseline: false` — scan as if no baseline existed, which is how the
+//     generator obtains the unsuppressed findings it writes one from.
 export async function scanPointerAnchors(repoRoot, opts = {}) {
   const { pointers, findings } = await collectPointers(repoRoot, opts);
-  return [...findings, ...(await verifyAnchors(repoRoot, pointers))];
+  const raw = [...findings, ...(await verifyAnchors(repoRoot, pointers))];
+  const withDigests = await attachDigests(repoRoot, raw, pointers);
+  if (opts.useBaseline === false) return withDigests;
+  return applyBaseline(withDigests, await loadBaseline(repoRoot, opts));
 }

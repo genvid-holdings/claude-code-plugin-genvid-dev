@@ -5,12 +5,17 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 
 import {
+  BASELINE_FILE,
+  applyBaseline,
+  baselineKey,
   buildTargetIndex,
   collectPointers,
+  digestCitedRange,
   extractAnchor,
   findAnchorOccurrences,
   listCitingFiles,
   listTargetCandidates,
+  loadBaseline,
   matchCandidates,
   normalizeAnchorText,
   normalizeForMatch,
@@ -1261,4 +1266,399 @@ test('scanPointerAnchors: a citing root that is absent contributes nothing', asy
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+// ---- the ratchet: keying ------------------------------------------------------
+
+test('baselineKey: the citing LINE NUMBER is not part of the key', () => {
+  // The renumber-survival property, stated at the level of the key itself: two
+  // findings for the same pointer differing only in where it sits in its own
+  // document are the same accepted pointer.
+  const at = (line) => ({ file: 'docs/notes.md', pointer: ptr('designer.md', '83'), occurrence: 0, line });
+  assert.equal(baselineKey(at(1)), baselineKey(at(400)));
+});
+
+test('baselineKey: file, pointer text and occurrence each discriminate', () => {
+  const base = { file: 'docs/notes.md', pointer: ptr('designer.md', '83'), occurrence: 0 };
+  const key = baselineKey(base);
+  assert.notEqual(key, baselineKey({ ...base, file: 'docs/other.md' }));
+  assert.notEqual(key, baselineKey({ ...base, pointer: ptr('designer.md', '84') }));
+  assert.notEqual(key, baselineKey({ ...base, occurrence: 1 }));
+  // A missing occurrence is the first one.
+  assert.equal(key, baselineKey({ file: base.file, pointer: base.pointer }));
+});
+
+test('collectPointers: identical raw pointers in one file get successive occurrence indices', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'plugin/agents/designer.md', numberedLines(120));
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      `First mention of ${cite('designer.md', '83')} here.\n` +
+        `\nSecond mention of ${cite('designer.md', '83')} there.\n`,
+    );
+  });
+  try {
+    const { pointers } = await collectPointers(dir);
+    assert.deepEqual(
+      pointers.map((p) => [p.line, p.occurrence]),
+      [
+        [1, 0],
+        [3, 1],
+      ],
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- the ratchet: the digest --------------------------------------------------
+
+test('digestCitedRange: nothing to digest yields null, never a hash of emptiness', () => {
+  const content = linesOf('alpha', 'beta', 'gamma');
+  assert.equal(digestCitedRange(content, []), null);
+  assert.equal(digestCitedRange(null, [{ start: 1, end: 1 }]), null);
+  // A range wholly past the end of the target: the null-target case, not a
+  // digest that would then compare equal to every other out-of-range citation.
+  assert.equal(digestCitedRange(content, [{ start: 90, end: 92 }]), null);
+});
+
+test('digestCitedRange: only the CITED lines are digested', () => {
+  const before = linesOf('alpha', 'beta', 'gamma');
+  const after = linesOf('alpha', 'beta', 'REWRITTEN');
+  const cited = [{ start: 2, end: 2 }];
+  assert.equal(digestCitedRange(before, cited), digestCitedRange(after, cited));
+  assert.notEqual(
+    digestCitedRange(before, [{ start: 3, end: 3 }]),
+    digestCitedRange(after, [{ start: 3, end: 3 }]),
+  );
+});
+
+test('digestCitedRange: normalization-equivalent target text digests the same', () => {
+  // The same normalization anchor verification compares in — a change the
+  // verifier would call immaterial must not fire the ratchet either.
+  const plain = linesOf('When a refresh command exists, do not treat the copy as truth.');
+  const dressed = linesOf('    When a refresh command exists, **do NOT treat** the copy as truth.');
+  const cited = [{ start: 1, end: 1 }];
+  assert.equal(digestCitedRange(plain, cited), digestCitedRange(dressed, cited));
+});
+
+// ---- the ratchet: fixtures ----------------------------------------------------
+
+// One anchorless pointer into a fixture target — the shape 103 of this repo's
+// own findings have. (Its site is named through `cite` below rather than spelled
+// out in this comment, for the reason the header gives: a literal one here would
+// be a real pointer in the plugin's own corpus.) Its finding does not depend on
+// the TARGET's content at all, which is what lets the drift mutation below
+// change the target and still have a finding present to compare digests against.
+const ANCHORLESS_CITATION = `1. **Widening ${cite('designer.md', '83')}'s zero-hit positive-control bullet.**\n`;
+
+async function ratchetFixture(lead = '') {
+  return withTempRepo(async (d) => {
+    await writeRepoFile(d, 'plugin/agents/designer.md', numberedLines(120));
+    await writeRepoFile(d, 'docs/notes.md', lead + ANCHORLESS_CITATION);
+  });
+}
+
+// Exactly what the P6 generator will write: the identity fields plus the digest,
+// taken straight off an unsuppressed scan. Building the fixture baseline this
+// way — rather than hand-writing entries — pins that a finding really does carry
+// everything an entry needs.
+const entriesFrom = (findings) =>
+  findings.map((f) => ({
+    file: f.file,
+    pointer: f.pointer,
+    occurrence: f.occurrence,
+    kind: f.kind,
+    digest: f.digest,
+  }));
+
+const writeBaseline = (dir, findings) =>
+  writeRepoFile(dir, BASELINE_FILE, JSON.stringify({ version: 1, entries: entriesFrom(findings) }, null, 2) + '\n');
+
+const replaceLine = (content, number, text) => {
+  const lines = content.split('\n');
+  lines[number - 1] = text;
+  return lines.join('\n');
+};
+
+// ---- the ratchet: absent baseline is the loud state ---------------------------
+
+test('ratchet: with no baseline file every non-conforming pointer is reported', async () => {
+  const dir = await ratchetFixture();
+  try {
+    const findings = await scanPointerAnchors(dir);
+    assert.deepEqual(
+      findings.map((f) => [f.kind, f.file, f.line]),
+      [['pointer-anchor-missing', 'docs/notes.md', 1]],
+    );
+    // The finding carries its own baseline identity and a digest of the cited
+    // range, so a generator needs nothing the scan did not already produce.
+    assert.equal(findings[0].pointer, ptr('designer.md', '83'));
+    assert.equal(findings[0].occurrence, 0);
+    assert.equal(findings[0].target, 'plugin/agents/designer.md');
+    assert.equal(typeof findings[0].digest, 'string');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('ratchet: a malformed baseline suppresses nothing', async () => {
+  const dir = await ratchetFixture();
+  try {
+    const findings = await scanPointerAnchors(dir);
+    await writeBaseline(dir, findings);
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+
+    // Corrupting the file must fail toward RED, not toward accepting everything.
+    await writeRepoFile(dir, BASELINE_FILE, '{ this is not json\n');
+    assert.deepEqual((await loadBaseline(dir)).present, false);
+    assert.deepEqual(
+      (await scanPointerAnchors(dir)).map((f) => f.kind),
+      ['pointer-anchor-missing'],
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadBaseline: absent is not present, and a bare array is accepted', async () => {
+  const dir = await withTempRepo(async () => {});
+  try {
+    assert.deepEqual(await loadBaseline(dir), { present: false, entries: [] });
+
+    await writeRepoFile(
+      dir,
+      BASELINE_FILE,
+      JSON.stringify([{ file: 'docs/notes.md', pointer: ptr('a.md', '1') }]) + '\n',
+    );
+    const baseline = await loadBaseline(dir);
+    assert.equal(baseline.present, true);
+    assert.deepEqual(baseline.entries, [
+      { file: 'docs/notes.md', pointer: ptr('a.md', '1'), occurrence: 0, kind: null, digest: null },
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- the ratchet: a matching entry suppresses --------------------------------
+
+test('ratchet: a matching entry with an unchanged digest is suppressed', async () => {
+  const dir = await ratchetFixture();
+  try {
+    const before = await scanPointerAnchors(dir);
+    assert.equal(before.length, 1);
+    await writeBaseline(dir, before);
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('ratchet: an entry suppresses only its own occurrence of a repeated pointer', async () => {
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'plugin/agents/designer.md', numberedLines(120));
+    await writeRepoFile(
+      d,
+      'docs/notes.md',
+      `First mention of ${cite('designer.md', '83')} here.\n` +
+        `\nSecond mention of ${cite('designer.md', '83')} there.\n`,
+    );
+  });
+  try {
+    const before = await scanPointerAnchors(dir);
+    assert.deepEqual(
+      before.map((f) => [f.kind, f.occurrence]),
+      [
+        ['pointer-anchor-missing', 0],
+        ['pointer-anchor-missing', 1],
+      ],
+    );
+    await writeBaseline(dir, before.slice(0, 1));
+    // Accepting the first mention leaves the second reported — an occurrence
+    // index that collapsed identical pointers would have suppressed both.
+    assert.deepEqual(
+      (await scanPointerAnchors(dir)).map((f) => [f.kind, f.line]),
+      [['pointer-anchor-missing', 3]],
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- the ratchet: MUTATION — the pointer is removed ⇒ stale ------------------
+
+test('ratchet: deleting a baselined pointer from its citing file fires pointer-baseline-stale', async () => {
+  const dir = await ratchetFixture();
+  try {
+    const before = await scanPointerAnchors(dir);
+    await writeBaseline(dir, before);
+    // The system starts in the ACCEPTED state, so the mutation below is the
+    // only thing that can move it.
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+
+    // MUTATION: the pointer is gone from the citing file — repaired or deleted.
+    await writeRepoFile(dir, 'docs/notes.md', '1. **Widening the zero-hit positive-control bullet.**\n');
+
+    const after = await scanPointerAnchors(dir);
+    assert.equal(after.length, 1);
+    assert.equal(after[0].kind, 'pointer-baseline-stale');
+    assert.equal(after[0].severity, 'error');
+    assert.equal(after[0].ok, false);
+    assert.equal(after[0].file, 'docs/notes.md');
+    assert.equal(after[0].pointer, ptr('designer.md', '83'));
+    assert.match(after[0].detail, /prune the entry/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- the ratchet: MUTATION — the target moves ⇒ drifted ---------------------
+
+test('ratchet: editing the cited line under a baselined pointer fires pointer-baseline-drifted', async () => {
+  const dir = await ratchetFixture();
+  try {
+    const before = await scanPointerAnchors(dir);
+    await writeBaseline(dir, before);
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+
+    const targetPath = 'plugin/agents/designer.md';
+    const original = numberedLines(120);
+
+    // CONTROL: editing a line the pointer does NOT cite changes nothing, so the
+    // assertion below is about the cited range and not about the target file
+    // having been touched at all.
+    await writeRepoFile(dir, targetPath, replaceLine(original, 84, 'line 84 rewritten'));
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+
+    // MUTATION: the CITED line's content changes under the accepted pointer.
+    await writeRepoFile(dir, targetPath, replaceLine(original, 83, 'an entirely different claim'));
+
+    const after = await scanPointerAnchors(dir);
+    assert.equal(after.length, 1);
+    assert.equal(after[0].kind, 'pointer-baseline-drifted');
+    assert.equal(after[0].severity, 'error');
+    assert.equal(after[0].ok, false);
+    assert.equal(after[0].file, 'docs/notes.md');
+    assert.equal(after[0].line, 1);
+    assert.equal(after[0].pointer, ptr('designer.md', '83'));
+    // Both digests are named, so the entry can be re-taken deliberately.
+    assert.equal(after[0].baselineDigest, before[0].digest);
+    assert.notEqual(after[0].digest, before[0].digest);
+    assert.ok(after[0].detail.includes(before[0].digest));
+    assert.ok(after[0].detail.includes(after[0].digest));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- the ratchet: renumber survival -------------------------------------------
+
+test('ratchet: an accepted pointer survives its own document being renumbered', async () => {
+  const dir = await ratchetFixture();
+  try {
+    const before = await scanPointerAnchors(dir);
+    assert.equal(before[0].line, 1);
+    await writeBaseline(dir, before);
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+
+    // MUTATION: two lines inserted ABOVE the citation. Nothing about the claim
+    // it makes changed; only where it sits in its own file did.
+    await writeRepoFile(dir, 'docs/notes.md', 'A new opening paragraph.\n\n' + ANCHORLESS_CITATION);
+
+    // Control: the citing line really did move, so the suppression below is not
+    // passing because the mutation failed to land.
+    const unratcheted = await scanPointerAnchors(dir, { useBaseline: false });
+    assert.deepEqual(
+      unratcheted.map((f) => [f.kind, f.line]),
+      [['pointer-anchor-missing', 3]],
+    );
+
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- the ratchet: the null-target case ---------------------------------------
+
+test('ratchet: null-target findings round-trip through the baseline and never drift', async () => {
+  // All three kinds that have no single target — the shape 32 of this repo's
+  // 138 findings have, including the ambiguous ADR citations.
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'a/SKILL.md', numberedLines(200));
+    await writeRepoFile(d, 'b/SKILL.md', numberedLines(200));
+    await writeRepoFile(
+      d,
+      'docs/decisions/0022-bundle-root.md',
+      `The tier rule at ${cite('SKILL.md', '159')} ("line 159") governs this.\n` +
+        `\nGone: ${cite('nowhere/removed.md', '5')} ("line 5").\n` +
+        `\nThe bullet at ${cont('83')} says otherwise.\n`,
+    );
+  });
+  try {
+    const before = await scanPointerAnchors(dir);
+    assert.deepEqual(before.map((f) => f.kind).sort(), [
+      'pointer-ambiguous',
+      'pointer-orphan-continuation',
+      'pointer-unresolved',
+    ]);
+    // No single target ⇒ no cited range ⇒ no digest, on every one of them.
+    assert.deepEqual(
+      before.map((f) => f.digest),
+      [null, null, null],
+    );
+
+    // They are STORABLE all the same, and a stored one suppresses.
+    await writeBaseline(dir, before);
+    assert.deepEqual(await scanPointerAnchors(dir), []);
+
+    // MUTATION: both ambiguity candidates are rewritten wholesale. A design
+    // that compared digests here would have nothing to compare and must not
+    // invent a verdict from it.
+    await writeRepoFile(dir, 'a/SKILL.md', numberedLines(40));
+    await writeRepoFile(dir, 'b/SKILL.md', linesOf('a completely different document'));
+
+    const after = await scanPointerAnchors(dir);
+    assert.deepEqual(
+      after.filter((f) => f.kind === 'pointer-baseline-drifted'),
+      [],
+    );
+    assert.deepEqual(after, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('applyBaseline: a digest on one side only is not a drift verdict', () => {
+  // Reached when a baselined pointer becomes ambiguous (entry has a digest, the
+  // finding no longer can) or the reverse. Neither side has a comparison
+  // available, so the entry suppresses without claiming the target moved.
+  const finding = {
+    kind: 'pointer-anchor-missing',
+    ok: false,
+    severity: 'error',
+    detail: 'x',
+    file: 'docs/notes.md',
+    line: 1,
+    pointer: ptr('designer.md', '83'),
+    occurrence: 0,
+    digest: null,
+  };
+  const entry = { file: 'docs/notes.md', pointer: ptr('designer.md', '83'), occurrence: 0, kind: null, digest: 'abc123abc123' };
+  assert.deepEqual(applyBaseline([finding], { present: true, entries: [entry] }), []);
+  assert.deepEqual(
+    applyBaseline([{ ...finding, digest: 'abc123abc123' }], {
+      present: true,
+      entries: [{ ...entry, digest: null }],
+    }),
+    [],
+  );
+});
+
+test('applyBaseline: an absent baseline passes every finding through untouched', () => {
+  const findings = [{ kind: 'pointer-anchor-missing', file: 'docs/notes.md', line: 1, pointer: 'x', occurrence: 0, digest: null }];
+  assert.equal(applyBaseline(findings, { present: false, entries: [] }), findings);
+  assert.equal(applyBaseline(findings, null), findings);
 });
