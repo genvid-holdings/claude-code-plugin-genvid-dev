@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 import {
   BASELINE_FILE,
+  BASELINE_GENERATOR,
   applyBaseline,
   baselineKey,
   buildTargetIndex,
@@ -44,6 +46,18 @@ async function writeRepoFile(dir, rel, content) {
   const path = join(dir, rel);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, content);
+}
+
+// The repo-root half of the citing corpus is scoped by `git ls-files`, so the
+// fixtures that exercise it have to be real git repos. `git add` alone is
+// enough — `gitTrackedFiles` reads the index, so no commit and no configured
+// identity are needed.
+function git(dir, args) {
+  const result = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
+  }
+  return result.stdout;
 }
 
 // Every fixture pointer is ASSEMBLED at runtime rather than spelled out.
@@ -598,6 +612,32 @@ test('extractAnchor: a backticked path fragment carrying a slash is not an ident
   assert.equal(extractAnchor(tailAfter(line)), null);
 });
 
+test('extractAnchor: a backticked span carrying whitespace is not an identifier anchor', () => {
+  // The third exclusion, alongside the slash and the colon above. All three
+  // survive the hyphen being admitted below — a hyphen was never what kept a
+  // run of prose or a sibling citation out.
+  const line = `See ${cite('a/analyst.md', '59')}, ${span('two words')} follow.`;
+  assert.equal(extractAnchor(tailAfter(line)), null);
+});
+
+// ---- anchor extraction: kebab-case identifiers -------------------------------
+//
+// Skill names, agent names and hyphenated module filenames are among the most
+// common backticked spans this repo writes, so a grammar that rejected them
+// told authors to write an anchor they had already written.
+
+test('extractAnchor: a kebab-case name is an identifier anchor', () => {
+  const anchor = extractAnchor(tailAfter(`See ${cite('a/analyst.md', '59')} — ${span('plan-task')} owns it.`));
+  assert.equal(anchor.form, 'backticked');
+  assert.equal(anchor.text, 'plan-task');
+});
+
+test('extractAnchor: a hyphenated filename is an identifier anchor', () => {
+  const anchor = extractAnchor(tailAfter(`See ${cite('a/analyst.md', '59')}, ${span('md-scan.mjs')} applies.`));
+  assert.equal(anchor.form, 'backticked');
+  assert.equal(anchor.text, 'md-scan.mjs');
+});
+
 test('extractAnchor: a bare elision quotes nothing and is not an anchor', () => {
   assert.equal(extractAnchor(tailAfter(`See ${cite('a/analyst.md', '59')} ("…").`)), null);
 });
@@ -791,6 +831,10 @@ test('collectPointers: an orphan continuation is not also reported anchor-missin
 // ---- corpus scoping ----------------------------------------------------------
 
 test('listCitingFiles: takes .md and .mjs under docs/ and plugin/, including the changelog', async () => {
+  // No `git init` here, so the repo-root half contributes nothing and this
+  // stays a test of the two citing TREES alone — `examples/CLAUDE.md` is out
+  // because `examples/` is not a citing root, and the root `CLAUDE.md` is out
+  // because there is no index to prove it tracked (asserted directly below).
   const dir = await withTempRepo(async (d) => {
     await writeRepoFile(d, 'docs/notes.md', 'x\n');
     await writeRepoFile(d, 'plugin/CHANGELOG.md', 'x\n');
@@ -805,6 +849,76 @@ test('listCitingFiles: takes .md and .mjs under docs/ and plugin/, including the
       'plugin/CHANGELOG.md',
       'plugin/skills/s/scripts/lib/thing.mjs',
     ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('listCitingFiles: takes the repo root own tracked markdown, and no untracked file', async () => {
+  const dir = await withTempRepo(async (d) => {
+    git(d, ['init', '-q', '.']);
+    await writeRepoFile(d, 'docs/notes.md', 'x\n');
+    await writeRepoFile(d, 'CLAUDE.md', 'x\n');
+    await writeRepoFile(d, 'README.md', 'x\n');
+    await writeRepoFile(d, '.gitignore', 'plan.md\n');
+    // The gitignored working artifact. Present on disk, absent from the index.
+    await writeRepoFile(d, 'plan.md', 'x\n');
+    await writeRepoFile(d, 'notes.json', '{}\n');
+    git(d, ['add', 'docs/notes.md', 'CLAUDE.md', 'README.md', '.gitignore', 'notes.json']);
+  });
+  try {
+    assert.deepEqual(await listCitingFiles(dir), ['CLAUDE.md', 'README.md', 'docs/notes.md']);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('listCitingFiles: absent git, the repo root contributes nothing rather than failing', async () => {
+  // The graceful-degradation half: `gitTrackedFiles` returns null outside a
+  // git repo, and the tree walk must survive it untouched.
+  const dir = await withTempRepo(async (d) => {
+    await writeRepoFile(d, 'docs/notes.md', 'x\n');
+    await writeRepoFile(d, 'CLAUDE.md', 'x\n');
+    await writeRepoFile(d, 'README.md', 'x\n');
+  });
+  try {
+    assert.deepEqual(await listCitingFiles(dir), ['docs/notes.md']);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// The constraint most likely to be silently lost later, so it is pinned end to
+// end rather than at the corpus-listing seam alone.
+//
+// An untracked root document is not merely noise to filter: this repo's
+// planning artifacts carry pointers in bulk, including the very strings the
+// sibling guard test forbids the baseline from ever accepting. Scanning
+// one would mint findings that can be neither repaired (the artifact is not
+// the branch's to edit) nor accepted. The POSITIVE CONTROL is what makes the
+// absence meaningful — the same pointer shape, written into a tracked root
+// file in the same fixture, must be reported.
+test('scanPointerAnchors: a pointer in a gitignored root document is never reported, while the same shape in a tracked one is', async () => {
+  const dir = await withTempRepo(async (d) => {
+    git(d, ['init', '-q', '.']);
+    await writeRepoFile(d, '.gitignore', 'plan.md\n');
+    await writeRepoFile(d, 'CLAUDE.md', `Tracked cites ${cite('tracked/gone.mjs', '12')}\n`);
+    await writeRepoFile(d, 'plan.md', `Untracked cites ${cite('untracked/gone.mjs', '12')}\n`);
+    git(d, ['add', '.gitignore', 'CLAUDE.md']);
+  });
+  try {
+    const findings = await scanPointerAnchors(dir);
+    // POSITIVE CONTROL: the shape IS detected, from the tracked root file.
+    assert.deepEqual(
+      findings.map((f) => ({ kind: f.kind, file: f.file })),
+      [{ kind: 'pointer-unresolved', file: 'CLAUDE.md' }],
+    );
+    // THE CONSTRAINT: nothing at all came from the untracked artifact.
+    assert.equal(
+      findings.some((f) => f.file === 'plan.md' || f.pointer?.includes('untracked/gone.mjs')),
+      false,
+    );
+    assert.equal((await listCitingFiles(dir)).includes('plan.md'), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -1487,6 +1601,20 @@ test('ratchet: an entry suppresses only its own occurrence of a repeated pointer
   }
 });
 
+// ---- the ratchet: the remedy path itself -------------------------------------
+
+// A remedy naming a script that has moved is worse than one naming none, and
+// this file is where such a path would rot unnoticed. Resolved from the test's
+// own location so it fails if the generator is renamed or relocated.
+test('the baseline generator path names a file that really exists', async () => {
+  const { access } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const { resolve } = await import('node:path');
+  // scripts/test -> scripts -> audit-conventions -> skills -> plugin -> root
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
+  await access(join(repoRoot, BASELINE_GENERATOR));
+});
+
 // ---- the ratchet: MUTATION — the pointer is removed ⇒ stale ------------------
 
 test('ratchet: deleting a baselined pointer from its citing file fires pointer-baseline-stale', async () => {
@@ -1509,6 +1637,11 @@ test('ratchet: deleting a baselined pointer from its citing file fires pointer-b
     assert.equal(after[0].file, 'docs/notes.md');
     assert.equal(after[0].pointer, ptr('designer.md', '83'));
     assert.match(after[0].detail, /prune the entry/);
+    // The remedy names the script that performs it. The scanner is pure, so a
+    // finding that only says "prune the entry" leaves a red validate with no
+    // route to green — and the maintainer who hits it is the one who did the
+    // right thing and repaired the pointer.
+    assert.ok(after[0].detail.includes(BASELINE_GENERATOR));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -1548,6 +1681,9 @@ test('ratchet: editing the cited line under a baselined pointer fires pointer-ba
     assert.notEqual(after[0].digest, before[0].digest);
     assert.ok(after[0].detail.includes(before[0].digest));
     assert.ok(after[0].detail.includes(after[0].digest));
+    // …and so is the script that re-takes the entry, for the same reason the
+    // stale finding names the one that prunes it.
+    assert.ok(after[0].detail.includes(BASELINE_GENERATOR));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

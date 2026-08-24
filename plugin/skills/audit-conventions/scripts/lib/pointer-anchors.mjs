@@ -31,14 +31,16 @@ import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
 import { listUnder } from './fs-walk.mjs';
+import { gitTrackedFiles } from './git-info.mjs';
 import { iterateUnfencedLines } from './md-scan.mjs';
 
 // ---- corpus ------------------------------------------------------------------
 
 // CITING files — where a pointer may be WRITTEN.
 //
-// `.md` and `.mjs` under the repo-root `docs/` and `plugin/` trees. Two scoping
-// decisions here are load-bearing:
+// `.md` and `.mjs` under the repo-root `docs/` and `plugin/` trees, plus the
+// tracked files of the repo root ITSELF (see `listRootCitingFiles`). Two
+// scoping decisions here are load-bearing:
 //
 //   - `plugin/CHANGELOG.md` is deliberately INCLUDED, unlike the corpus
 //     principle-citations.mjs walks. Release-note prose cites agent bodies by
@@ -47,8 +49,7 @@ import { iterateUnfencedLines } from './md-scan.mjs';
 //   - `.json` is deliberately NOT a citing type. Pointer strings are stored in
 //     JSON — the ratchet baseline below, test fixtures — precisely so that
 //     recording a pointer does not mint a new one, and so the baseline cannot
-//     scan itself. (The baseline is doubly out of reach: it also sits at the
-//     repo root, which is neither of the two citing roots.)
+//     scan itself.
 export const CITING_ROOTS = ['docs', 'plugin'];
 export const CITING_EXTENSIONS = ['.md', '.mjs'];
 
@@ -93,11 +94,55 @@ export async function listTargetCandidates(repoRoot) {
   return [...new Set([...rootFiles, ...nested])].sort();
 }
 
+// The repo root's OWN citing files — `CLAUDE.md` and `README.md` in this repo.
+//
+// Excluding them was a real gap: `CLAUDE.md` is the densest single body of
+// prose about the plugin's internals, and it cited a moved line.
+//
+// Scoped by `git ls-files` rather than by a directory listing, and TRACKING IS
+// THE CONSTRAINT, not hygiene. The repo root is also where gitignored working
+// artifacts land — a transient planning document is the live case, and the one
+// present when this was written held eleven pointers — and admitting one would
+// break the ratchet two ways at once. Its findings would have to be baselined,
+// so the baseline would depend on a file no other developer has; and a working
+// document written while repairing pointers cites the very strings the guard
+// test forbids the baseline from ever accepting, so those findings could be
+// neither fixed (the artifact is not the branch's to edit) nor accepted.
+// Unresolvable by construction. Tracking is the line between the repo's own
+// prose and a local scratch file.
+//
+// Only the root's own entries are listed, never a walk from it: the two citing
+// TREES above are already walked whole, and re-deriving them here would just
+// duplicate that.
+//
+// A null from `gitTrackedFiles` — not a git repo, or git unavailable —
+// contributes nothing, the same graceful degradation hygiene.mjs applies to
+// the same null in its own config-candidate set. The tree walk is unaffected,
+// so a non-git checkout falls back to the previous corpus instead of failing.
+async function listRootCitingFiles(repoRoot) {
+  const tracked = gitTrackedFiles(repoRoot);
+  if (tracked == null) return [];
+
+  let entries;
+  try {
+    entries = await fs.readdir(repoRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .filter((name) => CITING_EXTENSIONS.some((ext) => name.endsWith(ext)))
+    .filter((name) => tracked.has(name));
+}
+
 export async function listCitingFiles(repoRoot) {
-  const files = await listUnder(repoRoot, CITING_ROOTS, (name) =>
+  const nested = await listUnder(repoRoot, CITING_ROOTS, (name) =>
     CITING_EXTENSIONS.some((ext) => name.endsWith(ext)),
   );
-  return files.filter((f) => !isSkipped(f));
+  const root = await listRootCitingFiles(repoRoot);
+  return [...new Set([...nested, ...root])].filter((f) => !isSkipped(f)).sort();
 }
 
 // ---- grammar -----------------------------------------------------------------
@@ -321,10 +366,19 @@ const ANCHOR_RE = new RegExp(
 );
 
 // A backticked anchor must be IDENTIFIER-shaped: no whitespace, no slash, no
-// colon. Without this the backticked span sitting after a comma in a run of
-// sibling citations would be read as an anchor for the pointer before it —
-// exactly the artifact class the delimiter anchoring exists to exclude.
-const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\))?$/;
+// colon. Those three exclusions are what does the work. Without them the
+// backticked span sitting after a comma in a run of sibling citations would be
+// read as an anchor for the pointer before it — exactly the artifact class the
+// delimiter anchoring exists to exclude, and a sibling pointer is ruled out by
+// its slash and its colon.
+//
+// A HYPHEN IS ADMITTED, and was never part of that defence. The corpus's most
+// common backticked spans are kebab-case skill and agent names and hyphenated
+// filenames; banning the hyphen rejected all of them as anchors while the
+// anchor-missing finding told their authors to write exactly what they had
+// already written. A hyphen cannot reintroduce the sibling-pointer artifact,
+// because a pointer needs the colon this pattern still refuses.
+const IDENTIFIER_RE = /^[A-Za-z_$][\w$-]*(?:\.[A-Za-z_$][\w$-]*)*(?:\(\))?$/;
 
 // Squeezes RUNS of whitespace to a single space. Squeezing rather than
 // replacing is load-bearing — see ANCHOR_LOOKAHEAD_LINES above.
@@ -868,6 +922,16 @@ export async function verifyAnchors(repoRoot, pointers) {
 // nothing rather than silently accepting everything.
 export const BASELINE_FILE = '.pointer-baseline.json';
 
+// The one and only WRITER of that file, named in both baseline findings below.
+//
+// Both of those findings describe a repair that ends in a baseline edit, and
+// the predictable encounter is the GOOD case: a maintainer repairs a baselined
+// pointer — exactly what this tool is for — and is met by a red `validate` with
+// no route back to green, because the scanner is pure and the remedy lives in a
+// script the finding never named. Path, not bare filename, so it can be run
+// from the repo root as written.
+export const BASELINE_GENERATOR = 'plugin/skills/audit-conventions/scripts/pointer-baseline.mjs';
+
 // A short digest is enough: it is compared for equality against a value written
 // by the same code, never brute-forced.
 export const DIGEST_LENGTH = 12;
@@ -1008,7 +1072,8 @@ export function applyBaseline(findings, baseline) {
         `${finding.file}:${finding.line} accepts '${finding.pointer}' in ${BASELINE_FILE}, but ` +
         `the content it cites has changed since the baseline was taken (${entry.digest} → ` +
         `${finding.digest}) — the acceptance no longer describes the cited lines, so re-read ` +
-        'the target and either repair the citation or re-take the baseline entry',
+        'the target and either repair the citation, or re-take the entry by deleting it from ' +
+        `${BASELINE_FILE} and running \`node ${BASELINE_GENERATOR} --write --accept-new\``,
       file: finding.file,
       line: finding.line,
       pointer: finding.pointer,
@@ -1026,8 +1091,9 @@ export function applyBaseline(findings, baseline) {
       severity: 'error',
       detail:
         `${BASELINE_FILE} accepts '${entry.pointer}' in ${entry.file}, but the current scan ` +
-        'reports nothing there — the pointer was repaired or removed, so prune the entry, ' +
-        'or the ratchet will silently re-accept the next pointer that lands on the same key',
+        'reports nothing there — the pointer was repaired or removed, so prune the entry with ' +
+        `\`node ${BASELINE_GENERATOR} --write\` (prune-only is that command's default), or ` +
+        'the ratchet will silently re-accept the next pointer that lands on the same key',
       file: entry.file,
       pointer: entry.pointer,
       occurrence: entry.occurrence,

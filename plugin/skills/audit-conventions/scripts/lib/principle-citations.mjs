@@ -56,8 +56,7 @@ async function safeReadFile(path) {
 // Fenced code blocks are skipped (the same rule md-scan.mjs's
 // iterateUnfencedLines applies, which scanBrokenLinks now consumes; this
 // scanner still carries its own copy) so a fenced example numbered list
-// can't inflate
-// the parsed set.
+// can't inflate the parsed set.
 export function parsePrincipleNumbers(content) {
   const numbers = new Set();
   const lines = content.split('\n');
