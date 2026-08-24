@@ -59,7 +59,7 @@ Alternatives considered and rejected:
    makes three sentences **false** without editing them, in files
    deliberately out of scope — `plugin/agents/planner.md:55` ("the single
    target two independent critics grade against"), `planner.md:62` ("the
-   single pre-committed target"), `plugin/agents/code-reviewer.md:96` ("the
+   single pre-committed target"), `plugin/agents/code-reviewer.md:101` ("the
    fixed target both … independently check against") — because the graders
    resolve the checklist *through* the issue body with no rule for picking
    among N, so N bodies removes the referent those sentences depend on; (c)

@@ -26,7 +26,7 @@ decide whether to match that family's severity or deviate.
 A mis-pointed citation is a functional regression in agent behavior, not a
 doc-tidiness gap: the citing skill or agent's guidance now points at the wrong
 principle, silently, with the reader none the wiser. `hasErrors` counts
-`error`-severity findings only (`audit.mjs:125`); a `warning` finding never
+`error`-severity findings only (`audit.mjs`'s `hasErrors`); a `warning` finding never
 moves the exit code. Making this check `warning` would mean enforcement rests
 entirely on someone reading the Warnings section by hand — precisely the
 discipline gap that let the #167 backstop-guard issue through in the first

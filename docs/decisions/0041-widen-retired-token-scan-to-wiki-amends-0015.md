@@ -150,7 +150,7 @@ Alternatives considered and rejected:
   already outside the walk at the default repo-root layout; excluded via its
   resolved, anchored path (never a bare directory name) on the rare nested
   layout, where a bare `"raw/"` would over-match (e.g. `docs/draw/`).
-- **`migrate.mjs:862`'s `scanDanglingReferences`** still hardcodes
+- **`migrate.mjs:864`'s `scanDanglingReferences`** still hardcodes
   `listMarkdown(repoRoot, 'docs')` — a known remaining `docs/`-hardcode,
   **explicitly out of scope** for this decision, recorded here so a later
   reader doesn't mistake it for audited-and-missed.

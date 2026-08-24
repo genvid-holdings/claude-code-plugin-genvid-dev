@@ -28,8 +28,8 @@ criteria`, `acceptance criterion`, or a straightforward singular/plural
 variant. `##` only: a `###` sub-heading or a heading carrying extra words
 (`## Acceptance criteria (proposed)`) is a near miss, not a match. Whatever
 spelling matched, the write always emits the body back out under the exact
-canonical `## Acceptance Criteria` — the heading `validator.md:34` and
-`code-reviewer.md:96` read literally. The body is rebuilt from three parts —
+canonical `## Acceptance Criteria` — the heading `validator.md:42` ("read its `## Acceptance Criteria` section") and
+`code-reviewer.md:101` ("the pre-committed `## Acceptance Criteria` checklist") read literally. The body is rebuilt from three parts —
 prefix (everything before the matched heading), span (heading through the
 next `## ` boundary or end of body), suffix (that boundary onward) — never
 from a line-number offset, since a `grep -n` offset is valid only for the
@@ -87,7 +87,7 @@ Alternatives considered and rejected:
 1. **Tolerate-and-preserve the matched spelling**, writing the section back
    under whatever heading text was already there instead of normalizing to
    the canonical form. Rejected: it breaks the literal reads at
-   `plugin/agents/validator.md:34` and `plugin/agents/code-reviewer.md:96`,
+   `plugin/agents/validator.md:42` ("read its `## Acceptance Criteria` section") and `plugin/agents/code-reviewer.md:101` ("the pre-committed `## Acceptance Criteria` checklist"),
    pulling two `area:agents` files into scope that neither #245, #274, nor
    #290 names, and it makes ADR-0017's fixed-heading guarantee false in
    practice for any body whose existing heading was a near-exact variant.

@@ -107,7 +107,7 @@ change.
 carry the two *half*-implementations of this rule, split across files:
 designer.md's "Run the footprint audit when the design removes or renames a
 shared symbol" item ("don't trust the analyst's narrative summary — grep the
-codebase") and `analyst.md:59` ("do not treat the committed copy as ground
+codebase") and `analyst.md:60` ("do not treat the committed copy as ground
 truth"). Mirroring #13 into both agents explicitly would unify the halves,
 but exceeds #180's ask; the shared principle is citable from them later if
 that unification becomes its own change.
