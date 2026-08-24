@@ -13,6 +13,7 @@ import { join, dirname, resolve } from 'node:path';
 
 import { listMarkdown } from './fs-walk.mjs';
 import { gitTrackedFiles } from './git-info.mjs';
+import { iterateUnfencedLines, maskInlineCode } from './md-scan.mjs';
 
 export const DEFAULT_RETIRED_TOKENS = ['genvid:', 'genvid-dev:', 'genvid-c3'];
 export const DEFAULT_EXCLUDE_PATHS = ['CHANGELOG.md', 'docs/superpowers/', 'docs/decisions/'];
@@ -32,21 +33,14 @@ export const RETIRED_TOKEN_CONFIG_CANDIDATES = [
   '.claude/settings.local.json',
 ];
 
-// Inline code spans and fenced code blocks are skipped (see maskInlineCode and
-// the inFence tracking in scanBrokenLinks below), so a doc showing
-// `[text](fake.md)` as a Markdown example no longer false-positives. Known
-// remaining limitation: reference-style links (`[text][ref]`) are not
-// resolved — intentionally out of scope (#135).
+// Inline code spans and fenced code blocks are skipped — scanBrokenLinks below
+// reads its lines through md-scan.mjs's iterateUnfencedLines (which suppresses
+// fenced blocks and their delimiter lines) and masks each one with that
+// module's maskInlineCode — so a doc showing `[text](fake.md)` as a Markdown
+// example no longer false-positives. Known remaining limitation:
+// reference-style links (`[text][ref]`) are not resolved — intentionally out
+// of scope (#135).
 const LINK_RE = /\[[^\]]*\]\(([^)]+)\)/g;
-
-// Blanks out backtick-delimited inline code spans on a single line so LINK_RE
-// doesn't match links shown as Markdown examples inside them. Operates
-// per-line (deliberately not `[\s\S]` across the whole file) so an unmatched
-// backtick run (no closing run on the same line) leaves the line unchanged —
-// normal links elsewhere on that line still scan.
-function maskInlineCode(line) {
-  return line.replace(/(`+)[\s\S]*?\1/g, (span) => ' '.repeat(span.length));
-}
 
 // ---- shared helpers ---------------------------------------------------------
 
@@ -222,18 +216,8 @@ export async function scanBrokenLinks(repoRoot, opts = {}) {
     const content = await safeReadFile(join(repoRoot, relPath));
     if (content == null) continue;
 
-    const lines = content.split('\n');
-    let inFence = false;
-    for (let idx = 0; idx < lines.length; idx++) {
-      const line = lines[idx];
-      const trimmed = line.trim();
-      if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
-        inFence = !inFence;
-        continue; // fence delimiter line itself never contains a link to scan
-      }
-      if (inFence) continue;
-
-      const maskedLine = maskInlineCode(line);
+    for (const { lineNumber, text } of iterateUnfencedLines(content)) {
+      const maskedLine = maskInlineCode(text);
       LINK_RE.lastIndex = 0;
       let match;
       while ((match = LINK_RE.exec(maskedLine))) {
@@ -258,7 +242,7 @@ export async function scanBrokenLinks(repoRoot, opts = {}) {
             kind: 'broken-link',
             ok: false,
             severity: 'warning',
-            detail: `${relPath}:${idx + 1} broken link -> ${rawTarget}`,
+            detail: `${relPath}:${lineNumber} broken link -> ${rawTarget}`,
           });
         }
       }

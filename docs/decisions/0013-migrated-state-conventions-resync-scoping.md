@@ -40,7 +40,7 @@ Alternatives rejected:
 - **Drift-aware `pushScaffold` across all states + a dedicated `--resync-conventions`
   flag** — rejected: `pushScaffold`'s skip-if-exists for `CONVENTIONS.md` is load-bearing
   #25 hand-edit protection (a greenfield repo may carry a hand-written/forked copy that
-  must never be clobbered; `migrate.test.mjs:265` guards exactly this). A blanket
+  must never be clobbered; `migrate.test.mjs:266` ("pre-existing CONVENTIONS.md / CLAUDE.md are SKIPPED, not overwritten") guards exactly this). A blanket
   drift-overwrite would regress that. A dedicated flag is also redundant new surface
   that bypasses the existing dry-run/clean-tree/reconcile machinery and contradicts
   `sync-config`, which already routes users to `--fix`.

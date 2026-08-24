@@ -67,7 +67,7 @@ the file and steers the *opposite* way (*"Prefer the corpus form wherever it
 expresses the same intent"*), so citing `:83` would hand #332 an argument
 against its own row shape; (c) `:83` anchors a three-site byte-exact steer —
 `grep -c "Prefer the count" plugin/agents/designer.md` → **3**, currently at
-`designer.md:83`/`:90`/`:98` — that ADR-0037 Decision (3) already pinned as
+`designer.md`'s "A criterion whose pass condition is zero hits", "A criterion's expected value must be satisfiable", and "A row that already answers can it fail" bullets — that ADR-0037 Decision (3) already pinned as
 churn-sensitive. `designer.md`'s "A behavioural assertion whose expected
 value is an empty collection" bullet already owns the exact epistemic
 position a comparison row shares — an empty result cannot distinguish
@@ -130,7 +130,7 @@ change's.
 Both new rules extend an existing group's axis rather than opening a new one:
 the scope trap extends group 2's baseline chain (`designer.md:89` is *how* to
 measure a baseline; the new rule at `:93` is *over what corpus*), and the
-comparison-control rule extends group 4 as a sub-bullet under `:103`, not as a
+comparison-control rule extends group 4 as a sub-bullet under `designer.md`'s "A behavioural assertion whose expected value is an empty collection" bullet, not as a
 third top-level lead. Bolded-lead distribution moves from the measured
 baseline **2/2/2/2/1 = 9** (ADR-0037:22) to **2/3/2/2/1 = 10** — group 2 gains
 the one new top-level lead, group 4's new sub-bullet is nested and does not
@@ -216,7 +216,7 @@ Alternatives considered and rejected:
    comparison row**, rather than specializing the empty-collection/mutation
    bullet. Rejected per decision (2): wrong axis (group 1 is about pattern
    soundness, not cross-row settleability), the nearest-neighbour text at
-   `:97` argues the opposite direction, and `:83` is already a pinned
+   `designer.md`'s "A positive control evaluated against the" bullet argues the opposite direction, and `:83` is already a pinned
    three-site steer this change had no reason to put at further churn risk.
 2. **Widening `approval-and-audit.md:25` in place** rather than adding a new
    adjacent item. Rejected per decision (4): it would be that sentence's third

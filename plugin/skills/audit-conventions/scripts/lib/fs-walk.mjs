@@ -29,3 +29,17 @@ export async function listFiles(repoRoot, sub, predicate) {
 export async function listMarkdown(repoRoot, sub) {
   return listFiles(repoRoot, sub, (name) => name.endsWith('.md'));
 }
+
+// Recursively list files matching `predicate` under each of <repoRoot>/<sub> for
+// every sub in `subs`, returning the de-duplicated union as sorted repo-relative
+// posix paths. Overlapping roots yield each file once; a root that does not exist
+// contributes nothing rather than throwing.
+export async function listUnder(repoRoot, subs, predicate) {
+  const seen = new Set();
+  for (const sub of subs) {
+    for (const file of await listFiles(repoRoot, sub, predicate)) {
+      seen.add(file);
+    }
+  }
+  return [...seen].sort();
+}

@@ -90,7 +90,7 @@ of a check that already has a correct owner.
   directory, one name" rule.
 - **ADR-0022's Decision-1 subsection** contains a claim this decision
   **corrects**, in the record rather than only in code: it stated, as a
-  *verified property*, that "`hygiene.mjs:18`'s `DEFAULT_EXCLUDE_PATHS` and
+  *verified property*, that "`hygiene.mjs`'s `DEFAULT_EXCLUDE_PATHS` and
   `listCandidateFiles` walk `docs/**.md` + repo-root `CLAUDE.md` only, so
   `wiki/` and `raw/` remain structurally outside it." That was true when
   written (2026-07-30) and is **false as of this decision** for
@@ -150,7 +150,7 @@ Alternatives considered and rejected:
   already outside the walk at the default repo-root layout; excluded via its
   resolved, anchored path (never a bare directory name) on the rare nested
   layout, where a bare `"raw/"` would over-match (e.g. `docs/draw/`).
-- **`migrate.mjs:862`'s `scanDanglingReferences`** still hardcodes
+- **`migrate.mjs:864`'s `scanDanglingReferences`** still hardcodes
   `listMarkdown(repoRoot, 'docs')` — a known remaining `docs/`-hardcode,
   **explicitly out of scope** for this decision, recorded here so a later
   reader doesn't mistake it for audited-and-missed.

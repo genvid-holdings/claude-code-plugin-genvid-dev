@@ -33,6 +33,7 @@ import { scanRetiredTokens, scanBrokenLinks, scanOrphanedDocs, candidateFileCoun
 import { resolveExpectationPath, overrideFindings, resolveDocsRoot } from './lib/path-overrides.mjs';
 import { checkReadmeInventory } from './lib/readme-inventory.mjs';
 import { scanPrincipleCitations } from './lib/principle-citations.mjs';
+import { scanPointerAnchors } from './lib/pointer-anchors.mjs';
 import { summarizeExpectations, formatScanSummary } from './lib/summary.mjs';
 import { PILLARS, parsePillars } from './lib/pillars.mjs';
 import { detectWikiAdoption } from './lib/practice-detect.mjs';
@@ -140,6 +141,23 @@ async function main() {
     // mis-pointed citation silently repoints agent guidance at the wrong
     // principle — a functional regression, not a doc-tidiness gap.
     findings.push(...(await scanPrincipleCitations(REPO_ROOT)));
+
+    // Also `error`, but the gate carries a DIFFERENT weight here — do not read
+    // the argument above as covering this call too. The principle-citation
+    // scanner is confined to this repo's `plugin/` tree, so it is inherently
+    // un-runnable against a consumer; this scanner's citing corpus reaches the
+    // repo-root `docs/` tree, including `docs/decisions/` — a directory
+    // consuming repos also have, because `create-adr` scaffolds it. Run
+    // ungated, this check would impose the content-anchor convention on every
+    // consumer's ADRs and fail their `commands.validate` over prose the plugin
+    // does not own.
+    //
+    // What makes `error` safe is therefore the gate itself, not the scanner's
+    // reach: AUDITING_PLUGIN_SOURCE is derived from the AUDITED repo (`relative(
+    // REPO_ROOT, PLUGIN_ROOT)` above), so inside this block "repo-root
+    // `docs/decisions/`" can only ever mean *this* repo's own ADRs. Move this
+    // call outside the block and the severity stops being defensible.
+    findings.push(...(await scanPointerAnchors(REPO_ROOT)));
   }
 
   const hygiene = await loadHygieneConfig(configFilename);
@@ -582,7 +600,11 @@ function formatFinding(f) {
     'pillar-unknown',
     'path-override',
   ];
-  if (SELF_CONTAINED_KINDS.includes(f.kind)) return `- ${f.detail}`;
+  // The pointer-anchor scanner is matched by PREFIX rather than enumerated: it
+  // emits eight kinds that all share the `pointer-` prefix, all self-contained,
+  // and the set grows with the ratchet. Without this the pointer findings
+  // render through the component branch below with `f.component` undefined.
+  if (SELF_CONTAINED_KINDS.includes(f.kind) || f.kind.startsWith('pointer-')) return `- ${f.detail}`;
   const reason = f.reason ? ` Reason: ${f.reason}` : '';
   return `- **${f.component}** expects ${f.kind === 'tool' ? `tool \`${f.target}\`` : `\`${f.target}\``} — ${f.detail}.${reason}`;
 }
