@@ -1,6 +1,6 @@
 // Integration test: scanPrincipleCitations (lib/principle-citations.mjs) is
 // wired into audit.mjs's AUDITING_PLUGIN_SOURCE block only — it must NOT fire
-// when auditing a consuming repo. AUDITING_PLUGIN_SOURCE (audit.mjs:50) is
+// when auditing a consuming repo. `audit.mjs`'s `AUDITING_PLUGIN_SOURCE` is
 // path-derived from PLUGIN_ROOT (this script's own install location) sitting
 // inside REPO_ROOT (the audited cwd); a temp-dir fixture repo is, by
 // construction, never that, so the gate is false there — this is the
