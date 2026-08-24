@@ -10,7 +10,7 @@
 
 Nothing in the repo defines where the OKF **bundle root** is, and that one choice drives provenance, link form, and `raw/` conformance simultaneously. The forcing constraint is spec §11.1: it requires parseable frontmatter on every non-reserved `.md` file *in the tree* rooted at the bundle. This repo's `raw/` tier is governed by a never-edit ("immutability") rule stated in **seven** places, two of them **inside the immutable files themselves** (`raw/karpathy-llm-wiki-agent-memory.md:5`, `raw/beyond-rag-llm-wiki-pattern.md:5`) — so the bundle-root choice determines whether §11.1 ever reaches a file that cannot legally be edited to satisfy it.
 
-`maintain-wiki` and `wiki-librarian` are unreleased (`plugin/CHANGELOG.md:14-15`) — there is no installed base and no migration owed by this decision.
+`maintain-wiki` and `wiki-librarian` are unreleased (`plugin/CHANGELOG.md`) — there is no installed base and no migration owed by this decision.
 
 ## Decision
 
@@ -72,4 +72,4 @@ Nine contradicted or open sites follow from this decision. **Nothing in this tab
 - **#150 is now buildable**: the conformance walk is exactly `<wikiDir>/**/*.md` minus `index.md`/`log.md` at any level, and §11's consumer clauses bound what it may flag.
 - **#191/#150 must not present `raw/` immutability as an OKF rule** — with `raw/` outside the bundle, OKF says nothing about it; `lint`'s check is a purely local convention.
 - Naming `<wikiDir>/log.md` a bundle-root reserved file puts §11.3 in force, activating §9's newest-first mandate against `wiki/log.md:3-5`'s append-only wording. Surfaced, not resolved here — #190 owns it.
-- The numbering slip: #189's title and AC 1 name ADR-0021, which #194 took instead. This ADR is its own example of the rule already recorded at `plugin/CHANGELOG.md:24` — do not mint a specific decision-record number into a proposed issue body, because a number parked in a backlog issue is a soft reservation nothing detects going stale.
+- The numbering slip: #189's title and AC 1 name ADR-0021, which #194 took instead. This ADR is its own example of the rule already recorded at `plugin/CHANGELOG.md` — do not mint a specific decision-record number into a proposed issue body, because a number parked in a backlog issue is a soft reservation nothing detects going stale.

@@ -7,6 +7,10 @@ and follows [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`audit-conventions` gains a fifth content scan, `pointer-anchor`: a citation that names a line number must carry a content anchor, and that anchor is resolved against the cited file (#406).** A positional citation — a file path followed by a line number — is a pointer whose target moves whenever anything above it is edited, and until now nothing detected the drift: the citing sentence still reads plausibly while the number silently lands on unrelated text. The scan requires every positional citation to be followed **immediately** by a content anchor — a quoted span, a backticked identifier, or a colon-introduced quotation — naming what the cited line should contain; it then resolves the cited path to a real file and checks that the anchor is actually at the cited line. An anchor found elsewhere in the target reports as **drift, carrying the corrected line number**; an anchor absent from the target entirely reports as **broken**. The asymmetry is the point: a pointer carrying an anchor and *no* line number is fully conforming and structurally cannot decay, which makes the renumber-proof shape the cheapest way to comply — the remedy `ADR-0037` decision 4 and `ADR-0042` already reached, now enforceable rather than advisory. Severity is `error`, under the same author-time gate as the principle-citation check, so it can only ever fire against this repo's own corpus. Because `error` against a corpus that does not conform yet would make every pre-existing citation a blocker on unrelated work, the scan ships with a repo-root **ratchet baseline** plus a companion generator script: recorded debt passes, anything new does not. Nine stale citations across the ADR corpus were corrected in the same change. Reference `ADR-0047`. Behavioral skill/agent change → version bump at release.
+
 ## [4.20.0] - 2026-08-22
 
 ### Changed
