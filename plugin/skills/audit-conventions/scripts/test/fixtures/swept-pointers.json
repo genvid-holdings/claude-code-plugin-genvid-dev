@@ -1,0 +1,133 @@
+{
+  "why_this_file_is_json": [
+    "These pointer strings live in JSON, not in the test source, on purpose. The",
+    "pointer scanner's citing corpus is CITING_EXTENSIONS ['.md', '.mjs'] under",
+    "CITING_ROOTS ['docs', 'plugin'] — so the guard test itself, a .mjs file under",
+    "plugin/, is a citing file. Spelling any of these strings as a literal there",
+    "would mint a live pointer finding in this repo, and that finding could not be",
+    "baselined away, because the guard forbids exactly these strings from entering",
+    "the baseline. Unresolvable by construction. '.json' is not a citing",
+    "extension, so the strings are inert here."
+  ],
+  "why_these_strings_are_forbidden": [
+    "The baseline ratchet's --accept-new refuses to write while any pointer is",
+    "PROVABLY wrong — a drift or a broken anchor. It does NOT refuse for a pointer",
+    "that merely lacks an anchor, which is accepted debt. Six of the nine pointers",
+    "the sweep below repaired were in exactly that anchorless state, so nothing in",
+    "the tooling would stop a future maintainer from re-introducing one and",
+    "baselining it away. The ordering discipline that protected them lived only in",
+    "a plan document; test/pointer-baseline-guard.test.mjs makes it permanent by",
+    "asserting these strings never appear in .pointer-baseline.json."
+  ],
+  "pledgedSweep": {
+    "commit": "fb4ecf0",
+    "subject": "docs: correct nine stale file:line pointers in ADR-0013/0019/0021/0029/0032/0041",
+    "occurrences": 9,
+    "distinctPointers": 8,
+    "note": [
+      "The pledged set, graded against the unfixed tree. Nine occurrences of eight",
+      "distinct strings: 'plugin/agents/code-reviewer.md' at line 96 was cited from",
+      "two different ADRs. Six carried no anchor before the fix and three carried a",
+      "curated hand-written one that survived the renumber unchanged; the",
+      "'carriedAnchorBeforeFix' field records which is which, and the false ones are",
+      "the six the ratchet's refusal would not have caught."
+    ],
+    "pointers": [
+      {
+        "pointer": "migrate.test.mjs:265",
+        "citedFrom": "docs/decisions/0013-migrated-state-conventions-resync-scoping.md",
+        "citedFromLine": 43,
+        "carriedAnchorBeforeFix": false,
+        "correctedTo": "migrate.test.mjs:266 (\"pre-existing CONVENTIONS.md / CLAUDE.md are SKIPPED, not overwritten\")",
+        "fix": "The cited line was blank; renumbered to 266 and anchored on the guarding test's name rather than in place."
+      },
+      {
+        "pointer": "audit.mjs:125",
+        "citedFrom": "docs/decisions/0019-principle-citation-error-severity.md",
+        "citedFromLine": 29,
+        "carriedAnchorBeforeFix": false,
+        "correctedTo": "`audit.mjs`'s `hasErrors`",
+        "fix": "De-pointed entirely. Its target moved from 185 to 203 earlier on the same branch when the scanner was wired in, so a corrected number would have decayed again immediately; an anchor with no line number cannot decay."
+      },
+      {
+        "pointer": "analyst.md:59",
+        "citedFrom": "docs/decisions/0021-proposal-artifact-cross-check.md",
+        "citedFromLine": 110,
+        "carriedAnchorBeforeFix": true,
+        "correctedTo": "analyst.md:60",
+        "fix": "Renumbered by digits alone; the hand-written anchor (\"do not treat the committed copy as ground...\") was preserved byte-for-byte."
+      },
+      {
+        "pointer": "plugin/agents/code-reviewer.md:96",
+        "citedFrom": "docs/decisions/0029-combined-plan-canonical-issue.md",
+        "citedFromLine": 62,
+        "carriedAnchorBeforeFix": true,
+        "correctedTo": "plugin/agents/code-reviewer.md:101",
+        "fix": "Renumbered by digits alone; the hand-written anchor and its elision were preserved."
+      },
+      {
+        "pointer": "validator.md:34",
+        "citedFrom": "docs/decisions/0032-acceptance-criteria-splice-and-single-edit.md",
+        "citedFromLine": 31,
+        "carriedAnchorBeforeFix": false,
+        "correctedTo": "validator.md:42 (\"read its `## Acceptance Criteria` section\")",
+        "fix": "Renumbered and given a quoted anchor. The anchor is a quoted span rather than a backticked identifier because the scanner's identifier test rejects a backticked span containing whitespace."
+      },
+      {
+        "pointer": "code-reviewer.md:96",
+        "citedFrom": "docs/decisions/0032-acceptance-criteria-splice-and-single-edit.md",
+        "citedFromLine": 32,
+        "carriedAnchorBeforeFix": false,
+        "correctedTo": "code-reviewer.md:101 (\"the pre-committed `## Acceptance Criteria` checklist\")",
+        "fix": "Renumbered and given a quoted anchor."
+      },
+      {
+        "pointer": "plugin/agents/validator.md:34",
+        "citedFrom": "docs/decisions/0032-acceptance-criteria-splice-and-single-edit.md",
+        "citedFromLine": 90,
+        "carriedAnchorBeforeFix": false,
+        "correctedTo": "plugin/agents/validator.md:42 (\"read its `## Acceptance Criteria` section\")",
+        "fix": "Renumbered and given a quoted anchor. Same target as the repo-relative-less form on line 31, written with its full path here."
+      },
+      {
+        "pointer": "plugin/agents/code-reviewer.md:96",
+        "citedFrom": "docs/decisions/0032-acceptance-criteria-splice-and-single-edit.md",
+        "citedFromLine": 90,
+        "carriedAnchorBeforeFix": false,
+        "correctedTo": "plugin/agents/code-reviewer.md:101 (\"the pre-committed `## Acceptance Criteria` checklist\")",
+        "fix": "Renumbered and given a quoted anchor. This is the second occurrence of the same string; the first is the ADR-0029 entry above, which did carry an anchor."
+      },
+      {
+        "pointer": "migrate.mjs:862",
+        "citedFrom": "docs/decisions/0041-widen-retired-token-scan-to-wiki-amends-0015.md",
+        "citedFromLine": 153,
+        "carriedAnchorBeforeFix": true,
+        "correctedTo": "migrate.mjs:864",
+        "fix": "Renumbered by digits alone; the hand-written anchor was preserved byte-for-byte."
+      }
+    ]
+  },
+  "additionalSweep": {
+    "commit": "9628d85",
+    "subject": "audit-conventions: correct a stale audit.mjs pointer in the wiring test header",
+    "occurrences": 1,
+    "distinctPointers": 1,
+    "note": [
+      "A tenth stale pointer, deliberately kept SEPARATE from the pledged nine",
+      "above so a reader can still see the pledged set. It was found while building",
+      "the scanner rather than during the survey that established the nine, which",
+      "were graded against the unfixed tree before this correction existed. The",
+      "guard forbids it on the same grounds; it is simply not one of the nine."
+    ],
+    "pointers": [
+      {
+        "pointer": "audit.mjs:50",
+        "citedFrom": "plugin/skills/audit-conventions/scripts/test/principle-citations-wiring.test.mjs",
+        "citedFromLine": 3,
+        "carriedAnchorBeforeFix": false,
+        "correctedTo": "`audit.mjs`'s `AUDITING_PLUGIN_SOURCE`",
+        "fix": "De-pointed rather than renumbered. The target had moved three times (50 when the comment was written, 54 before the branch, 55 after the scanner was wired in). The comment already named the identifier, but BEFORE the pointer, and an anchor is only recognized following it."
+      }
+    ]
+  }
+}
