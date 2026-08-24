@@ -68,10 +68,11 @@ reach — and the gate is safe because `AUDITING_PLUGIN_SOURCE` is derived from 
 inside the block a repo-root `docs/decisions/` can only ever mean this repo's own records. Anyone reasoning
 from ADR-0019 that "an author-time scanner is naturally confined" would reach the wrong conclusion here.
 
-**(3) Corpus: `.md` and `.mjs` under the repo-root `docs/` and `plugin/` trees, excluding
-`audit-conventions-evals/` — and `plugin/CHANGELOG.md` is deliberately *included*.** That last clause diverges
-from `principle-citations`, whose corpus explicitly filters the changelog out. The reason is a positive
-control: release-note prose cites agent bodies by line, and one such pointer occurs nowhere else in the repo —
+**(3) Corpus: `.md` and `.mjs` under the repo-root `docs/` and `plugin/` trees plus the repo root's own
+*git-tracked* files, excluding `audit-conventions-evals/` — and `plugin/CHANGELOG.md` is deliberately
+*included*.** That last clause diverges from `principle-citations`, whose corpus explicitly filters the
+changelog out. The reason is a positive control: release-note prose cites agent bodies by line, and one such
+pointer occurs nowhere else in the repo —
 
 ```
 plugin/CHANGELOG.md cites `designer.md:79`
@@ -84,6 +85,27 @@ reason: its fixture consuming-repos carry contract filenames (`CLAUDE.md`, `docs
 them as resolution candidates would turn correct, unambiguous citations of the real files into ambiguity
 findings. `.json` is deliberately not a citing type, so recording a pointer in the baseline cannot mint a new
 one and the baseline cannot scan itself.
+
+**The repo root was added to the citing corpus after this record was first written, and *tracked* is the
+load-bearing word rather than a hygiene preference.** `CLAUDE.md` is the repo's densest prose about its own
+internals and cited a moved line, so a corpus stopping at the two trees left the most-read document in the
+repo unchecked. But the root is also where gitignored working artifacts land, and admitting one would break
+the ratchet from both ends at once: the transient planning document present when this landed carried eleven
+pointers, and a working document written *while repairing pointers* cites precisely the strings the guard test
+forbids the baseline from ever holding. Its findings could therefore be neither fixed — the artifact is not
+the branch's to edit, and no other developer has it — nor accepted. Unresolvable by construction. So the root
+half of the corpus is scoped by `git ls-files`, and only the root's own entries are listed, never a walk from
+it, since both trees above are already walked whole. A later refactor that swaps the tracked-file check for a
+plain directory listing reopens that trap silently, and the tell — a finding on a file no one else has —
+appears only on the machine that hits it.
+
+**The anchor grammar admits a hyphen inside a backticked identifier.** Kebab-case skill and agent names and
+hyphenated filenames are this corpus's most common backticked spans, and banning the hyphen rejected all of
+them as anchors while the convention was asking authors to write exactly that shape. The measured delta on the
+current corpus is **zero** — no pointer here is followed by a hyphenated span — so this is forward-looking
+rather than a fix. The hyphen was never part of the identifier constraint's defence and cannot reintroduce
+the sibling-pointer artifact that constraint exists to exclude: a sibling pointer needs a colon, which the
+pattern still refuses, alongside whitespace and a slash.
 
 **(4) The ratchet: `.pointer-baseline.json` at the repo root, keyed by citing file + pointer text +
 occurrence, with a digest of the cited target range.** Three properties, each chosen against a specific
@@ -155,6 +177,32 @@ refuses the thing it is being run to accept is unusable. The defence is placed e
 guard test pins the specific swept pointers that must never re-enter the baseline. That is narrower than a
 general rule, and it is recorded here as a known limit rather than presented as covered.
 
+**Verifying *anchor-only* references was measured and deliberately deferred, and this is the gap most likely
+to be mistaken for a guarantee.** The renumber-proof shape the Consequences section recommends is, by the
+grammar, not a pointer at all: with no line number nothing resolves, so the quoted anchor is never compared
+against the named file. Closing that — resolving a reference that names a file and quotes a span but gives no
+line — is buildable on the machinery already here, so it was priced against the current corpus rather than
+argued about:
+
+```
+53 anchor-only references in the corpus
+  31 resolve to exactly one target
+    30 verify clean
+     1 false positive
+```
+
+That single case is the entire reason the gap stays open, and it is a *class* rather than an accident:
+ADR-0045 quotes an issue's own characterisation of `plan-task/SKILL.md` — reported speech *about* the file,
+not a quotation *from* it — so the quoted words correctly appear nowhere in the target, and a checker cannot
+tell the two apart without reading intent. The check as it stands would therefore yield **zero true findings
+and one false one**, which is the wrong side of the ledger for a scanner running at `error`; a false red on
+correct prose is the failure direction this record has already refused once, in rejecting the proximity
+grammar. Anyone implementing it should handle the reported-speech class first — an explicit opt-out marker, or
+a grammar that treats a quotation as an anchor only where the citing sentence asserts the target contains it —
+rather than starting from the resolver. (The four figures were measured on the current corpus during this
+branch's follow-up probe and are point-in-time; the reported-speech case was separately confirmed by hand
+against the target.)
+
 **The `scanBrokenLinks` migration onto the shared fence-aware iterator was deferred past the red-proof
 commit.** Doing it earlier would have shifted `hygiene.mjs`'s `DEFAULT_EXCLUDE_PATHS` declaration off the line
 two ADRs cited live — a line serving as a positive control graded at that very commit. Moving a control's
@@ -167,10 +215,15 @@ branch's history carries a citation this refactor decayed.
 ## Consequences
 
 **Red is the default, and the baseline is now a maintained artifact.** A new pointer written without an anchor
-fails `commands.validate` for this repo. The renumber-proof shape is the one to reach for: name the file with
-a backticked identifier or quoted span and **no line number at all**, which is fully conforming and cannot
-decay. Where a line number genuinely helps, it must be followed immediately by a span that really appears
-there.
+fails `commands.validate` for this repo. The renumber-proof shape is still the one to reach for: name the file
+with a backticked identifier or quoted span and **no line number at all**. State its guarantee precisely,
+though — the grammar recognises a pointer only where a line number appears, so a reference without one is not
+a pointer, produces no finding, and is **never resolved against its target**. It therefore cannot decay from
+renumbering, which is the failure mode this scan exists for; but its anchor text is unchecked, and a quoted
+span appearing nowhere in the named file passes silently. The shape trades a verified-but-fragile citation for
+an unverified-but-stable one. That is a deliberate trade — see the Compromise section's measurement — and it
+does not change the recommendation. Where a line number genuinely helps, it must be followed immediately by a
+span that really appears there.
 
 **This record's own text was written under the check it documents.** Every stale pointer quoted above sits
 inside a fenced block, because the scanner skips fences and a live example would otherwise become a real
@@ -184,7 +237,9 @@ three content scanners share one fence implementation; the third does not.
 **The gate argument is now load-bearing in a way ADR-0019's was not, and must be re-checked if the corpus
 changes.** ADR-0019's scanner would be harmless even ungated. This one would not. Any future widening of the
 citing corpus — or any change that makes the check runnable outside `AUDITING_PLUGIN_SOURCE` — reopens the
-severity question rather than inheriting the answer recorded here.
+severity question rather than inheriting the answer recorded here. The repo-root widening in decision (3) is
+the first such case and was re-checked rather than waved through: it adds only files at *this* repo's root,
+which the path-derived gate already confines, so the answer holds — but it holds because it was re-asked.
 
 **ADR-0019's standing directive is discharged.** The fifth author-time content scanner decided severity on the
 merits, and reached the same verdict by a different route. That the *route* differed is itself the lesson: the
