@@ -1,0 +1,887 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "file": "docs/decisions/0013-migrated-state-conventions-resync-scoping.md",
+      "pointer": "plugin/CONVENTIONS.md:12",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "9b4f4c36644f"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": ":123-124",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "87d2002b7cfb"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": ":127",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "e3b0c44298fc"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": ":127",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "e3b0c44298fc"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": ".gvt-agent.json:25",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": ".gvt-agent.json:26",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "CLAUDE.md:100",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "docs/wiki-schema.md:1-26",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "2673f2a309d8"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "docs/wiki-schema.md:1-26",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "2673f2a309d8"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "docs/wiki-schema.md:126",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "e3b0c44298fc"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "docs/wiki-schema.md:38-46,55-57",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "339a54b4b248"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "docs/wiki-schema.md:80-93",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "80f9ff3914aa"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "docs/wiki-schema.md:92-93",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "0501d89e66f7"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "docs/wiki-schema.md:95-110",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "831ed2a5eb54"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "plugin/CONVENTIONS.md:102-108",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "8d50a70bb3ad"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "plugin/CONVENTIONS.md:104",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "6c51d6f71181"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "plugin/skills/maintain-wiki/raw-readme.template.md:8-10",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "3cbd2d5b75cc"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "plugin/skills/maintain-wiki/SKILL.md:29,159-163",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "c35791e2536a"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "plugin/skills/maintain-wiki/wiki-schema.template.md:65-78",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "d8804b97def9"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "raw-readme.template.md:8",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "43e335bb5a44"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "raw/beyond-rag-llm-wiki-pattern.md:5",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "8166e5b7824b"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "raw/beyond-rag-llm-wiki-pattern.md:5",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "8166e5b7824b"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "raw/karpathy-llm-wiki-agent-memory.md:5",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "8166e5b7824b"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "raw/karpathy-llm-wiki-agent-memory.md:5",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "8166e5b7824b"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "raw/README.md:8",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "43e335bb5a44"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "raw/README.md:8-10",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "3cbd2d5b75cc"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "SKILL.md:150-153",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "SKILL.md:154-158",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "SKILL.md:159",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-log.template.md:3-6",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "a75109f28089"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-log.template.md:8-10",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "704e0934b2c8"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-schema.template.md:111",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "e8cc70d61988"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-schema.template.md:114-128",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "745eb26bde5b"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-schema.template.md:23-31,40-42",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "5d9de6eeaa70"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-schema.template.md:25-26",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "aad9c46d9e9f"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-schema.template.md:3-11",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "b8d193bcde1a"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-schema.template.md:77-78",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "94ea92462f8d"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki-schema.template.md:80-95",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "fe05154242fd"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki/log.md:3-5",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "75248baad407"
+    },
+    {
+      "file": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md",
+      "pointer": "wiki/log.md:3-5",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "75248baad407"
+    },
+    {
+      "file": "docs/decisions/0025-okf-consumer-bound-in-the-skill-body.md",
+      "pointer": "wiki/audit-conventions-as-proto-lint.md:46",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "44ea193ed191"
+    },
+    {
+      "file": "docs/decisions/0025-okf-consumer-bound-in-the-skill-body.md",
+      "pointer": "wiki/llm-wiki-pattern-in-gvt-dev.md:49",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "fb4d0eea9cb7"
+    },
+    {
+      "file": "docs/decisions/0026-okf-dogfood-migration-semantics.md",
+      "pointer": "docs/wiki-schema.md:117-118",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "855969b29fb7"
+    },
+    {
+      "file": "docs/decisions/0026-okf-dogfood-migration-semantics.md",
+      "pointer": "docs/wiki-schema.md:184-185",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "aebdb6018f2d"
+    },
+    {
+      "file": "docs/decisions/0026-okf-dogfood-migration-semantics.md",
+      "pointer": "plugin/agents/wiki-librarian.md:58",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "7976fc8bd77d"
+    },
+    {
+      "file": "docs/decisions/0026-okf-dogfood-migration-semantics.md",
+      "pointer": "plugin/skills/maintain-wiki/wiki-schema.template.md:88",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "330c1fde60fc"
+    },
+    {
+      "file": "docs/decisions/0026-okf-dogfood-migration-semantics.md",
+      "pointer": "wiki/audit-conventions-as-proto-lint.md:63",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "e3b0c44298fc"
+    },
+    {
+      "file": "docs/decisions/0026-okf-dogfood-migration-semantics.md",
+      "pointer": "wiki/llm-wiki-pattern-in-gvt-dev.md:42",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "8c3817a019be"
+    },
+    {
+      "file": "docs/decisions/0026-okf-dogfood-migration-semantics.md",
+      "pointer": "wiki/llm-wiki-pattern-in-gvt-dev.md:73",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "c4d1702bb50f"
+    },
+    {
+      "file": "docs/decisions/0026-okf-dogfood-migration-semantics.md",
+      "pointer": "wiki/llm-wiki-pattern-in-gvt-dev.md:84",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "17d9da6cc8fa"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":103",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "8e3ed4a6ee70"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":25",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "df8f34369900"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":25",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "df8f34369900"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":25",
+      "occurrence": 2,
+      "kind": "pointer-anchor-missing",
+      "digest": "df8f34369900"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":25",
+      "occurrence": 3,
+      "kind": "pointer-anchor-missing",
+      "digest": "df8f34369900"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":26",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "34fb11b2aa8f"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":83",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "2f39d5f7ffed"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":83",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "2f39d5f7ffed"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":83",
+      "occurrence": 2,
+      "kind": "pointer-anchor-missing",
+      "digest": "2f39d5f7ffed"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":83",
+      "occurrence": 3,
+      "kind": "pointer-anchor-missing",
+      "digest": "2f39d5f7ffed"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":90",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "bd9ae4d6e7a7"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":92",
+      "occurrence": 0,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":92",
+      "occurrence": 1,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":92",
+      "occurrence": 2,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":93",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "42a61299701e"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":97",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "e3b0c44298fc"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":98",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "1c70c60eb376"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": ":98",
+      "occurrence": 1,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "approval-and-audit.md:25",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "df8f34369900"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "approval-and-audit.md:25",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "df8f34369900"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "approval-and-audit.md:25",
+      "occurrence": 2,
+      "kind": "pointer-anchor-missing",
+      "digest": "df8f34369900"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "designer.md:83",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "2f39d5f7ffed"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "designer.md:83",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "2f39d5f7ffed"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "designer.md:83",
+      "occurrence": 2,
+      "kind": "pointer-anchor-missing",
+      "digest": "2f39d5f7ffed"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "designer.md:83",
+      "occurrence": 3,
+      "kind": "pointer-anchor-missing",
+      "digest": "2f39d5f7ffed"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "designer.md:89",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "471bc78125bf"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "designer.md:92",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "259e7dfe82a5"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "designer.md:93",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "42a61299701e"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "designer.md:93",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "42a61299701e"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "plan-task/SKILL.md:98",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "79839881acff"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "planner.md:66",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "d17c3f90a767"
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "SKILL.md:102",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0038-baseline-scope-trap-and-measured-claim-reexecution.md",
+      "pointer": "SKILL.md:72",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "approval-and-audit.md:11",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "6e026f43a51b"
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "issue-triage-analyst.md:54",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "c53984141809"
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "plugin/agents/issue-triage-analyst.md:54",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "c53984141809"
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "plugin/skills/plan-task/approval-and-audit.md:11",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "6e026f43a51b"
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "plugin/skills/triage-issues/SKILL.md:313-314",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "90d1e443f348"
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "SKILL.md:68",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "SKILL.md:68",
+      "occurrence": 1,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "SKILL.md:68",
+      "occurrence": 2,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0039-mechanism-three-question-gate-and-approval-boundary.md",
+      "pointer": "triage-issues/SKILL.md:313-314",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "90d1e443f348"
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": ":100",
+      "occurrence": 0,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": ":97",
+      "occurrence": 0,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": ":98",
+      "occurrence": 0,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": ":98",
+      "occurrence": 1,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": ":98",
+      "occurrence": 2,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": ":98",
+      "occurrence": 3,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": ":98",
+      "occurrence": 4,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": ":98",
+      "occurrence": 5,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": "planner.md:67",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "e8da7f3aaea2"
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": "planner.md:67",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "e8da7f3aaea2"
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": "planner.md:67",
+      "occurrence": 2,
+      "kind": "pointer-anchor-missing",
+      "digest": "e8da7f3aaea2"
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": "planner.md:68",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "bc4bcfec5b84"
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": "plugin/skills/split-branch/SKILL.md:136",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "2dae67b04af9"
+    },
+    {
+      "file": "docs/decisions/0040-capture-mechanism-property-prescription-and-self-reversing-marker.md",
+      "pointer": "split-branch/SKILL.md:136",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "2dae67b04af9"
+    },
+    {
+      "file": "docs/decisions/0041-widen-retired-token-scan-to-wiki-amends-0015.md",
+      "pointer": "wiki/audit-conventions-as-proto-lint.md:30",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "ec167416ec40"
+    },
+    {
+      "file": "docs/decisions/0041-widen-retired-token-scan-to-wiki-amends-0015.md",
+      "pointer": "wiki/audit-conventions-as-proto-lint.md:30",
+      "occurrence": 1,
+      "kind": "pointer-anchor-missing",
+      "digest": "ec167416ec40"
+    },
+    {
+      "file": "docs/decisions/0041-widen-retired-token-scan-to-wiki-amends-0015.md",
+      "pointer": "wiki/llm-wiki-pattern-in-gvt-dev.md:82-84",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "749bbf69c1af"
+    },
+    {
+      "file": "docs/decisions/0042-designer-group-2-reduction-row-and-scope-mirror.md",
+      "pointer": ":90",
+      "occurrence": 0,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0042-designer-group-2-reduction-row-and-scope-mirror.md",
+      "pointer": ":90",
+      "occurrence": 1,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0042-designer-group-2-reduction-row-and-scope-mirror.md",
+      "pointer": ":91",
+      "occurrence": 0,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0042-designer-group-2-reduction-row-and-scope-mirror.md",
+      "pointer": ":91",
+      "occurrence": 1,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0042-designer-group-2-reduction-row-and-scope-mirror.md",
+      "pointer": ":92",
+      "occurrence": 0,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0042-designer-group-2-reduction-row-and-scope-mirror.md",
+      "pointer": ":92",
+      "occurrence": 1,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0042-designer-group-2-reduction-row-and-scope-mirror.md",
+      "pointer": ":92",
+      "occurrence": 2,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/decisions/0042-designer-group-2-reduction-row-and-scope-mirror.md",
+      "pointer": ":92",
+      "occurrence": 3,
+      "kind": "pointer-orphan-continuation",
+      "digest": null
+    },
+    {
+      "file": "docs/TOC.md",
+      "pointer": "approval-and-audit.md:25",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "df8f34369900"
+    },
+    {
+      "file": "plugin/agents/designer.md",
+      "pointer": "planner.md:68",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "bc4bcfec5b84"
+    },
+    {
+      "file": "plugin/agents/designer.md",
+      "pointer": "plugin/skills/split-branch/SKILL.md:136",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "2dae67b04af9"
+    },
+    {
+      "file": "plugin/CHANGELOG.md",
+      "pointer": "CONVENTIONS.md:82",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "6563316b9749"
+    },
+    {
+      "file": "plugin/CHANGELOG.md",
+      "pointer": "designer.md:79",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "2d7bb56077bc"
+    },
+    {
+      "file": "plugin/CHANGELOG.md",
+      "pointer": "docs/decisions/0022-okf-bundle-root-is-the-wiki-tier.md:37",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "134b83f13ac0"
+    },
+    {
+      "file": "plugin/skills/audit-conventions/scripts/lib/hygiene.mjs",
+      "pointer": "SKILL.md:265-273",
+      "occurrence": 0,
+      "kind": "pointer-ambiguous",
+      "digest": null
+    },
+    {
+      "file": "plugin/skills/audit-conventions/scripts/lib/path-overrides.mjs",
+      "pointer": "CONVENTIONS.md:82-83",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "995d95f8fe27"
+    },
+    {
+      "file": "plugin/skills/audit-conventions/scripts/test/path-overrides-wiring.test.mjs",
+      "pointer": "CONVENTIONS.md:82",
+      "occurrence": 0,
+      "kind": "pointer-anchor-missing",
+      "digest": "6563316b9749"
+    }
+  ]
+}
