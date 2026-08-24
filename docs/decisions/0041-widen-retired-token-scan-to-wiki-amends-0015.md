@@ -90,7 +90,7 @@ of a check that already has a correct owner.
   directory, one name" rule.
 - **ADR-0022's Decision-1 subsection** contains a claim this decision
   **corrects**, in the record rather than only in code: it stated, as a
-  *verified property*, that "`hygiene.mjs:18`'s `DEFAULT_EXCLUDE_PATHS` and
+  *verified property*, that "`hygiene.mjs`'s `DEFAULT_EXCLUDE_PATHS` and
   `listCandidateFiles` walk `docs/**.md` + repo-root `CLAUDE.md` only, so
   `wiki/` and `raw/` remain structurally outside it." That was true when
   written (2026-07-30) and is **false as of this decision** for

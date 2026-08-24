@@ -34,7 +34,7 @@ const PRINCIPLES_DOC_PATH = 'plugin/docs/development-principles.md';
 //
 // Consequence: an illustrative example of a *bad* citation can't be written
 // anywhere under plugin/ — it fires for real. Masking inline code spans first
-// (as hygiene.mjs's maskInlineCode does for links) would NOT help, since the
+// (as md-scan.mjs's maskInlineCode does for links) would NOT help, since the
 // real form `` `development-principles.md` #11 `` puts the number outside the
 // span; masking would blank the anchoring keyword and lose genuine citations.
 // See ADR-0019.
@@ -53,8 +53,10 @@ async function safeReadFile(path) {
 // Parses the top-level ordered list of development-principles.md (lines
 // matching `/^(\d+)\.\s/` anchored at column 0 — no leading whitespace, so an
 // indented/nested list item is rejected) into a Set of principle numbers.
-// Fenced code blocks are skipped (mirrors scanBrokenLinks's inFence
-// tracking in hygiene.mjs) so a fenced example numbered list can't inflate
+// Fenced code blocks are skipped (the same rule md-scan.mjs's
+// iterateUnfencedLines applies, which scanBrokenLinks now consumes; this
+// scanner still carries its own copy) so a fenced example numbered list
+// can't inflate
 // the parsed set.
 export function parsePrincipleNumbers(content) {
   const numbers = new Set();
