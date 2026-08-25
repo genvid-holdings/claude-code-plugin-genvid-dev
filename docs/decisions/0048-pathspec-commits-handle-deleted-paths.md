@@ -1,7 +1,7 @@
 # 0048. A deleted path is not an exception to `plan-task`'s explicit-pathspec commit rule
 
 - **Status:** accepted
-- **Date:** 2026-08-24
+- **Date:** 2026-08-25
 - **Issue:** #439
 
 ## Context
