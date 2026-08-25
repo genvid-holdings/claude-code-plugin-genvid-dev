@@ -1,6 +1,6 @@
 {
   "name": "gvt-dev",
-  "version": "4.21.0",
+  "version": "4.22.0",
   "description": "Shared Claude Code skills, agents, and hooks for Genvid game projects. Provides commit, PR, planning, validation, rebase, and code-review workflows that read project context from a small convention contract (CLAUDE.md, CONVENTIONS.md, docs/TOC.md, .gvt-agent.json).",
   "author": {
     "name": "Genvid"
