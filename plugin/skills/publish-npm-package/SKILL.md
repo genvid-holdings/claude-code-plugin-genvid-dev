@@ -12,7 +12,7 @@ description: >-
   install it", "set up a release pipeline for this lib", "publish the first
   version to npmjs", "have releases show up on npm automatically", "wire up
   trusted publishing / provenance", "stop keeping an npm token in repo secrets",
-  scoping a package under @genvid, or moving a repo from pnpm to npm or CircleCI
+  scoping a package under @genvidtech, or moving a repo from pnpm to npm or CircleCI
   to GitHub Actions for releasing. It owns the whole job — package.json
   publish-readiness, the ci.yml/publish.yml workflows, the lockfile migration,
   and the one-time npm bootstrap handoff — so prefer it over wiring these steps
@@ -58,7 +58,7 @@ before wiring the automation that publishes it.
 Use it when a package needs to start publishing to npm, or when migrating an
 existing package's release pipeline to the public-github-actions recipe. Signals:
 "publish to npmjs.com", "pnpm → npm", "CircleCI → GitHub Actions", "trusted
-publishing", "@genvid scope", "provenance".
+publishing", "@genvidtech scope", "provenance".
 
 It is **not** for: publishing to a private/internal registry, packages that have
 **nothing to validate or publish**, or first-time repo creation. A package with
@@ -169,7 +169,7 @@ decision. Report a short summary to the user.
 
 These genuinely change the outcome — present them, don't pick silently:
 
-1. **Package name / scope.** genvid convention is scoped `@genvid/<pkg>`. If the
+1. **Package name / scope.** Genvid convention is scoped `@genvidtech/<pkg>`. If the
    package is currently unscoped (or published unscoped), renaming to a scope is
    a **new package name** — its bootstrap and trusted-publisher setup do **not**
    carry over from the old name and must be done fresh. Make that cost explicit.
