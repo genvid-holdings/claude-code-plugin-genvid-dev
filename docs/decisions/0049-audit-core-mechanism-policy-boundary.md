@@ -119,8 +119,8 @@ this repo's current tree:
 | `orphaned-doc` | **info** | **no** |
 
 `pillar-unknown` was omitted from every prior enumeration. Note also that the gate is applied at *two
-different layers* — two checks are gated by their call site, two gate themselves internally — so "is it inside
-the `if` block?" is not a reliable reading.
+different layers* — three checks are gated by their call site, two gate themselves internally — so "is it
+inside the `if` block?" is not a reliable reading.
 
 **`orphaned-doc` has three independent dimensions, and the third is stated nowhere in this repo today.**
 (1) *Gate membership* — it is **not** gated. (2) *Severity* — `info`, not `warning`. (3) **Blast radius** — it
@@ -212,14 +212,38 @@ $ git rev-parse origin/main:.../lib/config-resolve.mjs
 ```
 
 **Decision: keep them duplicated for now.** Today's cost is not drift — the copies are identical *right now*.
-It is **unverified** drift. This repo carries dedicated tests for both modules; `gvt-construct3` carries
-**none**, so a change to its copy breaks nothing in its suite. The duplication is asymmetric in **coverage**,
-not in code.
+It is **thinly-verified** drift, and the asymmetry is in **coverage depth**, not in code.
 
-The cheap mechanism that buys the property a shared tool is meant to deliver — *a divergence fails that repo's
-own build* — is mirroring those two test files into `gvt-construct3`: no production change, no npm, no npx, no
-network, no lockstep release. Filed as **#460**. Absorption into the shared tool is #457's answer, and is
-recorded here as conditional on it.
+This repo carries 155 lines of dedicated unit tests across two files (`frontmatter.test.mjs`,
+`config-resolve.test.mjs`). `gvt-construct3` has **no dedicated test file for either module** — its single
+`audit.test.mjs` is the whole suite — but it is not uncovered: it imports `extractFrontmatter` directly and
+exercises it in three tests, and covers `resolveKey` transitively through `evaluateConfig` and
+`resolveAgentConfig`. A mutation probe against a scratch copy of `gvt-construct3` at `origin/main` measured the
+consequence rather than assuming it:
+
+```
+baseline                              80 pass /  0 fail
+extractFrontmatter stubbed to null    77 pass /  3 fail
+resolveKey stubbed to undefined       61 pass / 19 fail
+restored (control)                    80 pass /  0 fail
+```
+
+So *a divergence in either module already fails `gvt-construct3`'s own build today.* That property is not
+missing and does not need to be bought.
+
+What is actually thin is **depth**: three frontmatter assertions and incidental transitive reach, versus 155
+lines of dedicated edge-case coverage on this side. A divergence in a well-trodden path is caught; one in an
+edge case the integration tests never reach is not. Mirroring the two dedicated test files into
+`gvt-construct3` closes that gap — no production change, no npm, no npx, no network, no lockstep release.
+Filed as **#460**, whose value is *depth of coverage*, not *existence of coverage*. Absorption into the shared
+tool is #457's answer, and is recorded here as conditional on it.
+
+> **Correction (2026-08-28, #452).** As first written this section claimed `gvt-construct3` "carries **none**"
+> and that "a change to its copy breaks nothing in its suite." Both were false, and the second was the
+> load-bearing half — it was the stated justification for #460. The claim came from observing that no
+> `frontmatter.test.mjs` or `config-resolve.test.mjs` exists there and inferring absence of coverage from
+> absence of a *file*. The mutation probe above falsifies it. The decision is unchanged and is if anything
+> better supported: the copies are not merely identical, their equivalence is actively enforced on both sides.
 
 ### Measured figures
 
@@ -348,9 +372,10 @@ shared tool is a boundary violation by definition, not a judgement call.
 tool emit a `diagnostic`-class finding, the structural guarantee behind the non-delegable gate is gone and the
 severity argument reverts to discipline. Watch for that specifically in review of #457.
 
-**The duplication decision has an expiry, not a rule.** #460 makes divergence detectable; it does not make it
-impossible. If the two copies ever diverge *intentionally*, this record's premise — that they are the same
-code — fails, and the mechanism category must be re-derived rather than inherited.
+**The duplication decision has an expiry, not a rule.** Divergence is already detectable on both sides;
+#460 deepens that coverage rather than creating it, and neither makes divergence impossible. If the two copies
+ever diverge *intentionally*, this record's premise — that they are the same code — fails, and the mechanism
+category must be re-derived rather than inherited.
 
 **This record ships no behavior change**, so it carries no version bump. It documents a decision about future
 work in two repositories, and its figures are point-in-time: a reader should re-run the commands above rather

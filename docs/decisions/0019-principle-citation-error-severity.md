@@ -13,24 +13,36 @@ across 13 files. Nothing validated them: not `claude plugin validate`
 Inserting a principle mid-list, or renumbering, silently repoints every
 downstream citation to a different principle, with no failure anywhere.
 
-#170 added `lib/principle-citations.mjs`, a fourth content scanner overall and
-the third wired into `audit.mjs`'s existing `AUDITING_PLUGIN_SOURCE` block,
-alongside the two established author-time checks in that block —
-`readme-inventory` and `desc-length` — both of which are `warning` severity.
-The new scanner had to decide whether to match that family's severity or
-deviate.
+#170 added `lib/principle-citations.mjs`, the second scanner wired directly
+into `audit.mjs`'s existing `AUDITING_PLUGIN_SOURCE` block, joining the one
+check already there — `readme-inventory`. One further author-time check,
+`desc-length`, reaches the same gate by self-gating with an early return rather
+than by sitting inside the block. Both are `warning` severity. The new scanner
+had to decide whether to match that family's severity or deviate.
 
-**Correction (2026-08-28, #452):** as originally written, this section and the
-Compromise bullet below both named `orphaned-doc` as a third member of that
-author-time family. It is a member in neither respect: `scanOrphanedDocs` is
-invoked outside the gate block, alongside the other hygiene scanners, and emits
-`info` rather than `warning` — so it renders under `### Info (optional)` and
-**can** fire in a consumer's audit, against that consumer's own `docs/` tree.
-The claim was defective from the start rather than decayed: the check has a
-single authoring commit (2026-07-20, eight days before this record), and it was
-already ungated and `info` there. The decision below is unaffected — only this
-background enumeration was wrong. See ADR-0049 for the current classification
-of every check.
+**Correction (2026-08-28, #452), in two parts.**
+
+*First:* as originally written, this section and the Compromise bullet below
+both named `orphaned-doc` as a member of that author-time family. It is a
+member in neither respect: `scanOrphanedDocs` is invoked outside the gate
+block, alongside the other hygiene scanners, and emits `info` rather than
+`warning` — so it renders under `### Info (optional)` and **can** fire in a
+consumer's audit, against that consumer's own `docs/` tree. The claim was
+defective from the start rather than decayed: the check has a single authoring
+commit (2026-07-20, eight days before this record), and it was already ungated
+and `info` there.
+
+*Second:* the first pass at this correction replaced one membership error with
+another, describing `desc-length` as sitting "in that block". It does not —
+`evaluateDescriptionLengths` is called before the block opens and self-gates
+with an early `AUDITING_PLUGIN_SOURCE` return. That is exactly the reading the
+companion correction in ADR-0047 warns against, reproduced in the act of fixing
+its sibling, which is worth recording: the gate is enforced at two layers, and
+"is the call inside the `if`?" answers only one of them.
+
+The decision below is unaffected by either part — only this background
+enumeration was wrong. See ADR-0049 for the current classification of every
+check.
 
 ## Decision
 
