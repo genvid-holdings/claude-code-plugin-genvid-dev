@@ -10,9 +10,19 @@ This repo's prose and code comments cite each other *positionally* — a path, a
 checked those citations. When a cited target gains a line above the cited one, the citation keeps rendering
 exactly as it did before, so the decay is **silent by construction**: a reader follows the pointer, lands on
 unrelated text, and gets no signal that the claim ever pointed elsewhere. The four pre-existing author-time
-content scanners (`readme-inventory`, `desc-length`, `orphaned-doc`, `principle-citations`) covered index rows,
-description length and principle numbers — nothing covered the single most decay-prone claim shape the repo
-writes.
+content scanners (`readme-inventory`, `desc-length`, `pillar-unknown`, `principle-citations`) covered index
+rows, description length, pillar ids and principle numbers — nothing covered the single most decay-prone claim
+shape the repo writes.
+
+**Correction (2026-08-28, #452):** this enumeration originally named `orphaned-doc` in place of
+`pillar-unknown`. The count of four was right; the membership was not. `orphaned-doc` is not author-time at
+all — `scanOrphanedDocs` is invoked outside the gate block, alongside the other hygiene scanners, and emits
+`info` rather than `warning`, so it **can** fire in a consumer's audit against that consumer's own `docs/`
+tree. `pillar-unknown` is the fourth genuine member; note it gates *itself* with an early
+`AUDITING_PLUGIN_SOURCE` return rather than sitting inside the block, so "is the call inside the `if`?" is not
+a sound reading of the gated set. The claim was defective from the start rather than decayed — `orphaned-doc`
+has a single authoring commit (2026-07-20) and was already ungated and `info` there. The decision below is
+unaffected. See ADR-0049 for the current classification of every check.
 
 The convention itself was already settled and recorded twice. ADR-0037 decision (4) established *re-anchor
 first, insert second*, converting nine line-number references into quoted-text anchors before the insertion

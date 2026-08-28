@@ -13,11 +13,24 @@ across 13 files. Nothing validated them: not `claude plugin validate`
 Inserting a principle mid-list, or renumbering, silently repoints every
 downstream citation to a different principle, with no failure anywhere.
 
-#170 added `lib/principle-citations.mjs`, a fourth content scanner wired into
-`audit.mjs`'s existing `AUDITING_PLUGIN_SOURCE` block alongside the three
-established author-time checks — `readme-inventory`, `desc-length`,
-`orphaned-doc` — all of which are `warning` severity. The new scanner had to
-decide whether to match that family's severity or deviate.
+#170 added `lib/principle-citations.mjs`, a fourth content scanner overall and
+the third wired into `audit.mjs`'s existing `AUDITING_PLUGIN_SOURCE` block,
+alongside the two established author-time checks in that block —
+`readme-inventory` and `desc-length` — both of which are `warning` severity.
+The new scanner had to decide whether to match that family's severity or
+deviate.
+
+**Correction (2026-08-28, #452):** as originally written, this section and the
+Compromise bullet below both named `orphaned-doc` as a third member of that
+author-time family. It is a member in neither respect: `scanOrphanedDocs` is
+invoked outside the gate block, alongside the other hygiene scanners, and emits
+`info` rather than `warning` — so it renders under `### Info (optional)` and
+**can** fire in a consumer's audit, against that consumer's own `docs/` tree.
+The claim was defective from the start rather than decayed: the check has a
+single authoring commit (2026-07-20, eight days before this record), and it was
+already ungated and `info` there. The decision below is unaffected — only this
+background enumeration was wrong. See ADR-0049 for the current classification
+of every check.
 
 ## Decision
 
@@ -52,9 +65,10 @@ with a misleading finding count and obscure the actual root cause.
 
 Alternatives rejected:
 
-- **`warning`, for family consistency with `readme-inventory` / `desc-length`
-  / `orphaned-doc`.** Rejected as unenforced: warnings don't move the exit
-  code, so the whole point of the check — catching a silent repoint before it
+- **`warning`, for family consistency with `readme-inventory` /
+  `desc-length`.** *(As written this bullet also listed `orphaned-doc`; see the
+  correction in Context above — 2026-08-28, #452.)* Rejected as unenforced:
+  warnings don't move the exit code, so the whole point of the check — catching a silent repoint before it
   ships — would depend on a human reading the Warnings section rather than on
   the build failing.
 - **`warning` now, `error` later once the check has proven itself.** Rejected
