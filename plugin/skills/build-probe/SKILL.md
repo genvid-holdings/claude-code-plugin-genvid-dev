@@ -8,6 +8,9 @@ metadata:
       - path: CLAUDE.md
         required: false
         reason: Read to understand the real system a probe targets — repo layout, conventions, the domain the question is about
+    tools:
+      - command: git
+        reason: A mutation probe must confirm its revert landed before the result is reported — a partly-failed restore otherwise commits a deliberate defect
 ---
 
 # Build Probe
@@ -81,9 +84,12 @@ presenting a single run as the property.
 hard with `ENOTCACHED`, and that finding became the stated premise of a filed
 issue. Re-run later the same command exited 0 — the original probe had
 downloaded and cached the package it was testing for absence. An uncached
-control still failed, so the hazard was real but *intermittent*, which is a
-materially different and worse property than the reliable failure first
-reported.)
+control still failed, so the hazard was real but **conditional on cache state**
+rather than reliable — a materially different and worse property to depend on
+than the hard failure first reported. Note the wording: the behaviour is fully
+determined *given* the state, not random. Reporting it as "intermittent" would
+teach the opposite of what this step exists to teach, which is that the state
+decides the answer.)
 
 **A claim of absence needs a mutation, not a listing.** The same discipline
 covers "this is untested", "nothing reads this value", "no caller depends on
@@ -95,6 +101,21 @@ field, change the constant, run the suite, then restore and re-run to confirm
 the baseline came back. Verify each mutation actually landed before measuring;
 a silently-failed edit reports the unmutated baseline and reads exactly like
 "nothing depends on this."
+
+**A mutation is the one probe that cannot live in the scratchpad, so contain it
+deliberately.** Step 2's rule — never write a probe into the repo tree — still
+governs the probe *script*, but a mutation has to touch the real source for the
+suite to see it, which puts a deliberate defect in tracked files. That is
+exactly the state an orchestrated run is least able to absorb: under
+`plan-task`'s staged-but-uncommitted protocol other tasks' work is already in
+the index, so an intervening `git add -A`, or a restore that partly fails,
+commits the defect. Prefer a **copy of the tree you can throw away** — a
+scratch extract, or a detached worktree at the commit you mean to measure —
+which keeps the mutation out of the index entirely and lets a failed restore
+cost nothing. When mutating in place is unavoidable, require a clean tree
+first, revert **before** any commit, and confirm with `git status --porcelain`
+that the revert actually landed rather than assuming it. Never report a
+mutation result from a tree you have not re-confirmed clean.
 
 ## 4. Report on-thread
 
