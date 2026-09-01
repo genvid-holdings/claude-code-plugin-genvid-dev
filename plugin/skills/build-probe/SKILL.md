@@ -8,6 +8,9 @@ metadata:
       - path: CLAUDE.md
         required: false
         reason: Read to understand the real system a probe targets — repo layout, conventions, the domain the question is about
+    tools:
+      - command: git
+        reason: A mutation probe must confirm its revert landed before the result is reported — a partly-failed restore otherwise commits a deliberate defect
 ---
 
 # Build Probe
@@ -58,6 +61,61 @@ offending instances, the actual sample. Don't round it, don't pre-average it,
 don't silently drop outliers before you've looked at them — the entire point
 of running the probe is to let the concrete result overrule the guess that
 motivated it.
+
+**Ask whether running the probe changes what the probe measures.** Some
+observations are not repeatable because the act of observing them mutates the
+system: fetching a package populates a download cache, running a build fills an
+incremental-build directory, a first request warms a connection pool or a CDN
+edge, an auth probe mints a token that the next call reuses. Where that is
+true, the **first** run answers a different question from every run after it,
+and the number you keep is whichever one you happened to write down.
+
+The tell is a probe whose subject is *absence* — not cached, not installed, not
+authenticated, not built — since absence is exactly the state a probe tends to
+destroy. Guard it by pairing the real invocation with a **control that is
+guaranteed to be in the clean state**: probe a package name that certainly is
+not cached, a target that certainly has not been built. If the control and the
+real invocation disagree, the difference is your answer, and reporting only one
+of them is reporting an artifact. Where no clean control can be constructed,
+say so and mark the result **not reproducible on this machine** rather than
+presenting a single run as the property.
+
+(Observed on this repo: an offline-`npx` probe reported that the command fails
+hard with `ENOTCACHED`, and that finding became the stated premise of a filed
+issue. Re-run later the same command exited 0 — the original probe had
+downloaded and cached the package it was testing for absence. An uncached
+control still failed, so the hazard was real but **conditional on cache state**
+rather than reliable — a materially different and worse property to depend on
+than the hard failure first reported. Note the wording: the behaviour is fully
+determined *given* the state, not random. Reporting it as "intermittent" would
+teach the opposite of what this step exists to teach, which is that the state
+decides the answer.)
+
+**A claim of absence needs a mutation, not a listing.** The same discipline
+covers "this is untested", "nothing reads this value", "no caller depends on
+that field": a directory listing that shows no dedicated test file is evidence
+about *files*, not about *coverage*, and the two come apart routinely when
+coverage arrives through an integration test or a transitive call. Establish it
+by breaking the thing and observing what fails — stub the function, delete the
+field, change the constant, run the suite, then restore and re-run to confirm
+the baseline came back. Verify each mutation actually landed before measuring;
+a silently-failed edit reports the unmutated baseline and reads exactly like
+"nothing depends on this."
+
+**A mutation is the one probe that cannot live in the scratchpad, so contain it
+deliberately.** Step 2's rule — never write a probe into the repo tree — still
+governs the probe *script*, but a mutation has to touch the real source for the
+suite to see it, which puts a deliberate defect in tracked files. That is
+exactly the state an orchestrated run is least able to absorb: under
+`plan-task`'s staged-but-uncommitted protocol other tasks' work is already in
+the index, so an intervening `git add -A`, or a restore that partly fails,
+commits the defect. Prefer a **copy of the tree you can throw away** — a
+scratch extract, or a detached worktree at the commit you mean to measure —
+which keeps the mutation out of the index entirely and lets a failed restore
+cost nothing. When mutating in place is unavoidable, require a clean tree
+first, revert **before** any commit, and confirm with `git status --porcelain`
+that the revert actually landed rather than assuming it. Never report a
+mutation result from a tree you have not re-confirmed clean.
 
 ## 4. Report on-thread
 
